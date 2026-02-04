@@ -45,4 +45,14 @@ Send-Mail -Subject "Alert" -Body "<h1>Alert</h1><p>Check the logs.</p>" -IsHtml 
 Send-Mail -Subject "Deployment" -Body "The deployment finished successfully."
 ```
 
+### Send an email with attachments
+```powershell
+Send-Mail -Subject "Monthly Report" -Body "Please find the report attached." -To "recipient@example.com" -Attachments @("./report.pdf")
+```
+
+### Send an email with multiple attachments
+```powershell
+Send-Mail -Subject "Project Files" -Body "Here are the requested files." -To "recipient@example.com" -Attachments @("./document.pdf", "./data.xlsx", "./image.png")
+```
+
 Use `-Verbose` to see high-level progress and `-Debug` for detailed diagnostics, including the resolved SMTP configuration.

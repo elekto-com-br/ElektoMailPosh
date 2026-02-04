@@ -21,6 +21,9 @@ O nome do remetente. Se não fornecido, usa o nome da máquina.
 .PARAMETER To
 O destinatário do e-mail. Se não fornecido, será usado o valor da variável de ambiente `SMTP_TO`.
 
+.PARAMETER Attachments
+Array de caminhos de arquivos para anexar ao e-mail. Os arquivos devem existir no sistema de arquivos.
+
 .NOTES
 As credenciais e configurações do servidor SMTP devem ser definidas nas variáveis de ambiente:
 - SMTP_USER
@@ -38,6 +41,11 @@ Este exemplo envia um e-mail simples para o destinatário.
 Send-Mail -Subject "Alerta" -Body "<h1>Alerta</h1><p>Mensagem</p>" -IsHtml $true
 
 Este exemplo envia um e-mail em formato HTML com o assunto "Alerta".
+
+.EXAMPLE
+Send-Mail -Subject "Relatório" -Body "Segue em anexo o relatório." -To "destinatario@example.com" -Attachments @("C:\relatorio.pdf", "C:\dados.xlsx")
+
+Este exemplo envia um e-mail com dois arquivos anexados.
 #>
 Function Send-Mail {
     param (        
@@ -49,7 +57,8 @@ Function Send-Mail {
 
         [bool]$IsHtml = $False,
         [string]$FromName = $null,
-        [string]$To = $null        
+        [string]$To = $null,
+        [string[]]$Attachments = @()
     )
 
     # Carregar configurações de ambiente
@@ -92,25 +101,54 @@ Function Send-Mail {
     $mailMessage.Body = $Body
     $mailMessage.IsBodyHtml = $IsHtml
 
+    # Validar e adicionar anexos
+    $attachmentObjects = @()
+    foreach ($attachmentPath in $Attachments) {
+        if (-not (Test-Path -Path $attachmentPath -PathType Leaf)) {
+            # Limpar recursos já criados antes de sair
+            foreach ($att in $attachmentObjects) {
+                $att.Dispose()
+            }
+            $mailMessage.Dispose()
+            $smtpClient.Dispose()
+            Write-Error "O arquivo de anexo não foi encontrado: '$attachmentPath'"
+            return
+        }
+        $fullPath = (Resolve-Path -Path $attachmentPath).Path
+        $attachment = New-Object System.Net.Mail.Attachment($fullPath)
+        $mailMessage.Attachments.Add($attachment)
+        $attachmentObjects += $attachment
+        Write-Verbose "Anexo adicionado: $fullPath"
+    }
+
     # Envio do e-mail com retry e backoff exponencial
     $maxRetries = 5
     $retryCount = 0
     $delay = 1
 
-    while ($retryCount -lt $maxRetries) {
-        try {
-            $smtpClient.Send($mailMessage)
-            Write-Verbose "E-mail enviado com sucesso."
-            return
-        } catch {
-            $retryCount++
-            if ($retryCount -ge $maxRetries) {
-                Write-Error "Erro ao enviar e-mail após $maxRetries tentativas: $_"
+    try {
+        while ($retryCount -lt $maxRetries) {
+            try {
+                $smtpClient.Send($mailMessage)
+                Write-Verbose "E-mail enviado com sucesso."
                 return
+            } catch {
+                $retryCount++
+                if ($retryCount -ge $maxRetries) {
+                    Write-Error "Erro ao enviar e-mail após $maxRetries tentativas: $_"
+                    return
+                }
+                Write-Warning "Erro ao enviar e-mail: $_. Tentando novamente em $delay segundos..."
+                Start-Sleep -Seconds $delay
+                $delay *= 2
             }
-            Write-Warning "Erro ao enviar e-mail: $_. Tentando novamente em $delay segundos..."
-            Start-Sleep -Seconds $delay
-            $delay *= 2
         }
+    } finally {
+        # Liberar recursos dos anexos e da mensagem
+        foreach ($att in $attachmentObjects) {
+            $att.Dispose()
+        }
+        $mailMessage.Dispose()
+        $smtpClient.Dispose()
     }
 }
