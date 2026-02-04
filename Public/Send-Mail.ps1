@@ -48,11 +48,13 @@ Send-Mail -Subject "Relatório" -Body "Segue em anexo o relatório." -To "destin
 Este exemplo envia um e-mail com dois arquivos anexados.
 #>
 Function Send-Mail {
-    param (        
+    param (
         [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [string]$Subject,
 
         [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [string]$Body,
 
         [bool]$IsHtml = $False,
@@ -63,7 +65,7 @@ Function Send-Mail {
 
     # Carregar configurações de ambiente
     Write-Debug "Chamada: Subject='$Subject', Body='$Body', IsHtml='$IsHtml', FromName='$FromName', To='$To'."
-    Write-Debug "Ambiente: SMTP_SERVER='$env:SMTP_SERVER', SMTP_PORT='$env:SMTP_PORT', SMTP_FROM='$env:SMTP_FROM', SMTP_TO='$env:SMTP_TO', SMTP_USER='$env:SMTP_USER', SMTP_PASS='$env:SMTP_PASS'"
+    Write-Debug "Ambiente: SMTP_SERVER='$env:SMTP_SERVER', SMTP_PORT='$env:SMTP_PORT', SMTP_FROM='$env:SMTP_FROM', SMTP_TO='$env:SMTP_TO', SMTP_USER='$env:SMTP_USER', SMTP_PASS='$(if($env:SMTP_PASS){"[DEFINIDO]"}else{"[NAO DEFINIDO]"})'"
 
     $smtpUser = $env:SMTP_USER
     $smtpPass = $env:SMTP_PASS
@@ -85,7 +87,7 @@ Function Send-Mail {
         return
     }
 
-    Write-Debug "Configuração: SMTP_SERVER='$smtpServer', SMTP_PORT='$smtpPort', SMTP_FROM='$smtpFrom', SMTP_USER='$smtpUser', SMTP_PASS='$smtpPass', TO='$To'."
+    Write-Debug "Configuração: SMTP_SERVER='$smtpServer', SMTP_PORT='$smtpPort', SMTP_FROM='$smtpFrom', SMTP_USER='$smtpUser', TO='$To'."
     Write-Verbose "Enviando e-mail para '$To' com assunto '$Subject'..."
 
     # Configuração do cliente SMTP
