@@ -21,6 +21,9 @@ O nome do remetente. Se não fornecido, usa o nome da máquina.
 .PARAMETER To
 O destinatário do e-mail. Se não fornecido, será usado o valor da variável de ambiente `SMTP_TO`.
 
+.PARAMETER Attachments
+Array de caminhos de arquivos para anexar ao e-mail. Os arquivos devem existir no sistema de arquivos.
+
 .NOTES
 As credenciais e configurações do servidor SMTP devem ser definidas nas variáveis de ambiente:
 - SMTP_USER
@@ -38,23 +41,31 @@ Este exemplo envia um e-mail simples para o destinatário.
 Send-Mail -Subject "Alerta" -Body "<h1>Alerta</h1><p>Mensagem</p>" -IsHtml $true
 
 Este exemplo envia um e-mail em formato HTML com o assunto "Alerta".
+
+.EXAMPLE
+Send-Mail -Subject "Relatório" -Body "Segue em anexo o relatório." -To "destinatario@example.com" -Attachments @("C:\relatorio.pdf", "C:\dados.xlsx")
+
+Este exemplo envia um e-mail com dois arquivos anexados.
 #>
 Function Send-Mail {
-    param (        
+    param (
         [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [string]$Subject,
 
         [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [string]$Body,
 
         [bool]$IsHtml = $False,
         [string]$FromName = $null,
-        [string]$To = $null        
+        [string]$To = $null,
+        [string[]]$Attachments = @()
     )
 
     # Carregar configurações de ambiente
     Write-Debug "Chamada: Subject='$Subject', Body='$Body', IsHtml='$IsHtml', FromName='$FromName', To='$To'."
-    Write-Debug "Ambiente: SMTP_SERVER='$env:SMTP_SERVER', SMTP_PORT='$env:SMTP_PORT', SMTP_FROM='$env:SMTP_FROM', SMTP_TO='$env:SMTP_TO', SMTP_USER='$env:SMTP_USER', SMTP_PASS='$env:SMTP_PASS'"
+    Write-Debug "Ambiente: SMTP_SERVER='$env:SMTP_SERVER', SMTP_PORT='$env:SMTP_PORT', SMTP_FROM='$env:SMTP_FROM', SMTP_TO='$env:SMTP_TO', SMTP_USER='$env:SMTP_USER', SMTP_PASS='$(if($env:SMTP_PASS){"[DEFINIDO]"}else{"[NAO DEFINIDO]"})'"
 
     $smtpUser = $env:SMTP_USER
     $smtpPass = $env:SMTP_PASS
@@ -64,9 +75,9 @@ Function Send-Mail {
         return
     }
 
-    $smtpServer = $env:SMTP_SERVER ?? "smtp.gmail.com"
-    $smtpPort = $env:SMTP_PORT ?? 587
-    $smtpFrom = $env:SMTP_FROM ?? $smtpUser    
+    $smtpServer = if ($env:SMTP_SERVER) { $env:SMTP_SERVER } else { "smtp.gmail.com" }
+    $smtpPort = if ($env:SMTP_PORT) { $env:SMTP_PORT } else { 587 }
+    $smtpFrom = if ($env:SMTP_FROM) { $env:SMTP_FROM } else { $smtpUser }    
     if ([string]::IsNullOrWhiteSpace($FromName)) { $FromName = $env:COMPUTERNAME }
             
     # O To opcional... aparentemente o PowerShell converte os $null de string para "" automaticamente, o que faz com que ?? falhe
@@ -76,7 +87,7 @@ Function Send-Mail {
         return
     }
 
-    Write-Debug "Configuração: SMTP_SERVER='$smtpServer', SMTP_PORT='$smtpPort', SMTP_FROM='$smtpFrom', SMTP_USER='$smtpUser', SMTP_PASS='$smtpPass', TO='$To'."
+    Write-Debug "Configuração: SMTP_SERVER='$smtpServer', SMTP_PORT='$smtpPort', SMTP_FROM='$smtpFrom', SMTP_USER='$smtpUser', TO='$To'."
     Write-Verbose "Enviando e-mail para '$To' com assunto '$Subject'..."
 
     # Configuração do cliente SMTP
@@ -91,26 +102,48 @@ Function Send-Mail {
     $mailMessage.Subject = $Subject
     $mailMessage.Body = $Body
     $mailMessage.IsBodyHtml = $IsHtml
+    $mailMessage.Headers.Add("X-Mailer", "ElektoMailPosh/0.2.0")
+
+    # Validar e adicionar anexos
+    foreach ($attachmentPath in $Attachments) {
+        if (-not (Test-Path -Path $attachmentPath -PathType Leaf)) {
+            # Limpar recursos já criados antes de sair (Dispose libera os attachments já adicionados)
+            $mailMessage.Dispose()
+            $smtpClient.Dispose()
+            Write-Error "O arquivo de anexo não foi encontrado: '$attachmentPath'"
+            return
+        }
+        $fullPath = (Resolve-Path -Path $attachmentPath).Path
+        $attachment = New-Object System.Net.Mail.Attachment($fullPath)
+        $mailMessage.Attachments.Add($attachment)
+        Write-Verbose "Anexo adicionado: $fullPath"
+    }
 
     # Envio do e-mail com retry e backoff exponencial
     $maxRetries = 5
     $retryCount = 0
     $delay = 1
 
-    while ($retryCount -lt $maxRetries) {
-        try {
-            $smtpClient.Send($mailMessage)
-            Write-Verbose "E-mail enviado com sucesso."
-            return
-        } catch {
-            $retryCount++
-            if ($retryCount -ge $maxRetries) {
-                Write-Error "Erro ao enviar e-mail após $maxRetries tentativas: $_"
+    try {
+        while ($retryCount -lt $maxRetries) {
+            try {
+                $smtpClient.Send($mailMessage)
+                Write-Verbose "E-mail enviado com sucesso."
                 return
+            } catch {
+                $retryCount++
+                if ($retryCount -ge $maxRetries) {
+                    Write-Error "Erro ao enviar e-mail após $maxRetries tentativas: $_"
+                    return
+                }
+                Write-Warning "Erro ao enviar e-mail: $_. Tentando novamente em $delay segundos..."
+                Start-Sleep -Seconds $delay
+                $delay *= 2
             }
-            Write-Warning "Erro ao enviar e-mail: $_. Tentando novamente em $delay segundos..."
-            Start-Sleep -Seconds $delay
-            $delay *= 2
         }
+    } finally {
+        # Liberar recursos (MailMessage.Dispose() também libera os Attachments)
+        $mailMessage.Dispose()
+        $smtpClient.Dispose()
     }
 }
