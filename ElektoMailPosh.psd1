@@ -30,7 +30,7 @@ CompanyName = 'Elekto Produtos Financeiros'
 Copyright = '(c) JP Negri. All rights reserved.'
 
 # Description of the functionality provided by this module
-Description = 'Send mails using a normal smtp. Quick and easy.'
+Description = 'Lightweight SMTP email module for PowerShell. Zero dependencies, environment-based configuration, automatic retry with exponential backoff. Perfect for CI/CD pipelines, automation scripts, and scheduled tasks.'
 
 # Minimum version of the PowerShell engine required by this module
 PowerShellVersion = '5.1'
@@ -95,28 +95,28 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        # Tags = @()
+        Tags = @(
+            'Email', 'SMTP', 'Mail', 'Send-Mail', 'Notification',
+            'Automation', 'CI-CD', 'DevOps', 'GitHub-Actions', 'Azure-Pipelines',
+            'Lightweight', 'Simple', 'Environment-Variables', 'Cross-Platform',
+            'Windows', 'Linux', 'macOS'
+        )
 
         # A URL to the license for this module.
-        # LicenseUri = ''
+        LicenseUri = 'https://github.com/elekto-com-br/ElektoMailPosh/blob/main/LICENSE'
 
         # A URL to the main website for this project.
-        # ProjectUri = ''
-
-        # A URL to an icon representing this module.
-        # IconUri = ''
+        ProjectUri = 'https://github.com/elekto-com-br/ElektoMailPosh'
 
         # ReleaseNotes of this module
-        # ReleaseNotes = ''
-
-        # Prerelease string of this module
-        # Prerelease = ''
-
-        # Flag to indicate whether the module requires explicit user acceptance for install/update/save
-        # RequireLicenseAcceptance = $false
-
-        # External dependent modules of this module
-        # ExternalModuleDependencies = @()
+        ReleaseNotes = @'
+## 0.2.0
+- Added file attachments support (-Attachments parameter)
+- Added automatic retry with exponential backoff
+- Added X-Mailer header per RFC 2076
+- Environment-based configuration for CI/CD compatibility
+- PowerShell 5.1+ compatibility
+'@
 
     } # End of PSData hashtable
 
