@@ -1,51 +1,51 @@
 <#
 .SYNOPSIS
-Envia e-mails usando um servidor SMTP.
+Sends emails using an SMTP server.
 
 .DESCRIPTION
-A função `Send-Mail` permite enviar e-mails com suporte a HTML, configurações via variáveis de ambiente 
-ou parâmetros explícitos.
+The `Send-Mail` function sends emails with HTML support, configured via environment variables
+or explicit parameters. Ideal for automation scripts, CI/CD pipelines, and scheduled tasks.
 
 .PARAMETER Subject
-O assunto do e-mail. Este parâmetro é obrigatório.
+The email subject. This parameter is required.
 
 .PARAMETER Body
-O corpo do e-mail. Este parâmetro é obrigatório.
+The email body content. This parameter is required.
 
 .PARAMETER IsHtml
-Indica se o corpo do e-mail está em formato HTML. O padrão é $False.
+Indicates whether the body is HTML formatted. Default is $False.
 
 .PARAMETER FromName
-O nome do remetente. Se não fornecido, usa o nome da máquina.
+The sender display name. If not provided, uses the machine name.
 
 .PARAMETER To
-O destinatário do e-mail. Se não fornecido, será usado o valor da variável de ambiente `SMTP_TO`.
+The recipient email address. If not provided, uses the SMTP_TO environment variable.
 
 .PARAMETER Attachments
-Array de caminhos de arquivos para anexar ao e-mail. Os arquivos devem existir no sistema de arquivos.
+Array of file paths to attach to the email. Files must exist on the filesystem.
 
 .NOTES
-As credenciais e configurações do servidor SMTP devem ser definidas nas variáveis de ambiente:
-- SMTP_USER
-- SMTP_PASS
-- SMTP_SERVER (opcional, padrão: smtp.gmail.com)
-- SMTP_PORT (opcional, padrão: 587)
-- SMTP_FROM (opcional, padrão: SMTP_USER)
+SMTP credentials and settings must be defined via environment variables:
+- SMTP_USER (required)
+- SMTP_PASS (required)
+- SMTP_SERVER (optional, default: smtp.gmail.com)
+- SMTP_PORT (optional, default: 587)
+- SMTP_FROM (optional, default: SMTP_USER)
 
 .EXAMPLE
-Send-Mail -Subject "Teste 1" -Body "Conteúdo do Teste" -FromName "Teste" -To "destinatario@example.com"
+Send-Mail -Subject "Test" -Body "Test content" -FromName "MyApp" -To "recipient@example.com"
 
-Este exemplo envia um e-mail simples para o destinatário.
-
-.EXAMPLE
-Send-Mail -Subject "Alerta" -Body "<h1>Alerta</h1><p>Mensagem</p>" -IsHtml $true
-
-Este exemplo envia um e-mail em formato HTML com o assunto "Alerta".
+Sends a simple email to the recipient.
 
 .EXAMPLE
-Send-Mail -Subject "Relatório" -Body "Segue em anexo o relatório." -To "destinatario@example.com" -Attachments @("C:\relatorio.pdf", "C:\dados.xlsx")
+Send-Mail -Subject "Alert" -Body "<h1>Alert</h1><p>Check the logs.</p>" -IsHtml $true
 
-Este exemplo envia um e-mail com dois arquivos anexados.
+Sends an HTML formatted email with subject "Alert".
+
+.EXAMPLE
+Send-Mail -Subject "Report" -Body "Please find the report attached." -To "recipient@example.com" -Attachments @("./report.pdf", "./data.xlsx")
+
+Sends an email with two file attachments.
 #>
 Function Send-Mail {
     param (
@@ -63,39 +63,39 @@ Function Send-Mail {
         [string[]]$Attachments = @()
     )
 
-    # Carregar configurações de ambiente
-    Write-Debug "Chamada: Subject='$Subject', Body='$Body', IsHtml='$IsHtml', FromName='$FromName', To='$To'."
-    Write-Debug "Ambiente: SMTP_SERVER='$env:SMTP_SERVER', SMTP_PORT='$env:SMTP_PORT', SMTP_FROM='$env:SMTP_FROM', SMTP_TO='$env:SMTP_TO', SMTP_USER='$env:SMTP_USER', SMTP_PASS='$(if($env:SMTP_PASS){"[DEFINIDO]"}else{"[NAO DEFINIDO]"})'"
+    # Load environment configuration
+    Write-Debug "Call: Subject='$Subject', Body='$Body', IsHtml='$IsHtml', FromName='$FromName', To='$To'."
+    Write-Debug "Environment: SMTP_SERVER='$env:SMTP_SERVER', SMTP_PORT='$env:SMTP_PORT', SMTP_FROM='$env:SMTP_FROM', SMTP_TO='$env:SMTP_TO', SMTP_USER='$env:SMTP_USER', SMTP_PASS='$(if($env:SMTP_PASS){"[SET]"}else{"[NOT SET]"})'"
 
     $smtpUser = $env:SMTP_USER
     $smtpPass = $env:SMTP_PASS
 
     if (-not $smtpUser -or -not $smtpPass) {
-        Write-Error "As variáveis de ambiente SMTP_USER e/ou SMTP_PASS não estão configuradas."
+        Write-Error "Environment variables SMTP_USER and/or SMTP_PASS are not configured."
         return
     }
 
     $smtpServer = if ($env:SMTP_SERVER) { $env:SMTP_SERVER } else { "smtp.gmail.com" }
     $smtpPort = if ($env:SMTP_PORT) { $env:SMTP_PORT } else { 587 }
-    $smtpFrom = if ($env:SMTP_FROM) { $env:SMTP_FROM } else { $smtpUser }    
+    $smtpFrom = if ($env:SMTP_FROM) { $env:SMTP_FROM } else { $smtpUser }
     if ([string]::IsNullOrWhiteSpace($FromName)) { $FromName = $env:COMPUTERNAME }
-            
-    # O To opcional... aparentemente o PowerShell converte os $null de string para "" automaticamente, o que faz com que ?? falhe
-    if ([string]::IsNullOrWhiteSpace($To)) { $To = $env:SMTP_TO }        
+
+    # Optional To parameter - PowerShell converts null strings to "" automatically
+    if ([string]::IsNullOrWhiteSpace($To)) { $To = $env:SMTP_TO }
     if ([string]::IsNullOrWhiteSpace($To)) {
-        Write-Error "O parâmetro 'To' é obrigatório, seja na chamada da função ou na variável de ambiente SMTP_TO."
+        Write-Error "The 'To' parameter is required, either in the function call or via the SMTP_TO environment variable."
         return
     }
 
-    Write-Debug "Configuração: SMTP_SERVER='$smtpServer', SMTP_PORT='$smtpPort', SMTP_FROM='$smtpFrom', SMTP_USER='$smtpUser', TO='$To'."
-    Write-Verbose "Enviando e-mail para '$To' com assunto '$Subject'..."
+    Write-Debug "Configuration: SMTP_SERVER='$smtpServer', SMTP_PORT='$smtpPort', SMTP_FROM='$smtpFrom', SMTP_USER='$smtpUser', TO='$To'."
+    Write-Verbose "Sending email to '$To' with subject '$Subject'..."
 
-    # Configuração do cliente SMTP
+    # SMTP client configuration
     $smtpClient = New-Object Net.Mail.SmtpClient($smtpServer, $smtpPort)
     $smtpClient.EnableSsl = $true
     $smtpClient.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
 
-    # Criação da mensagem de e-mail
+    # Email message creation
     $mailMessage = New-Object Net.Mail.MailMessage
     $mailMessage.From = "$FromName <$smtpFrom>"
     $mailMessage.To.Add($To)
@@ -104,22 +104,22 @@ Function Send-Mail {
     $mailMessage.IsBodyHtml = $IsHtml
     $mailMessage.Headers.Add("X-Mailer", "ElektoMailPosh/0.2.0")
 
-    # Validar e adicionar anexos
+    # Validate and add attachments
     foreach ($attachmentPath in $Attachments) {
         if (-not (Test-Path -Path $attachmentPath -PathType Leaf)) {
-            # Limpar recursos já criados antes de sair (Dispose libera os attachments já adicionados)
+            # Clean up resources before exit (Dispose releases already added attachments)
             $mailMessage.Dispose()
             $smtpClient.Dispose()
-            Write-Error "O arquivo de anexo não foi encontrado: '$attachmentPath'"
+            Write-Error "Attachment file not found: '$attachmentPath'"
             return
         }
         $fullPath = (Resolve-Path -Path $attachmentPath).Path
         $attachment = New-Object System.Net.Mail.Attachment($fullPath)
         $mailMessage.Attachments.Add($attachment)
-        Write-Verbose "Anexo adicionado: $fullPath"
+        Write-Verbose "Attachment added: $fullPath"
     }
 
-    # Envio do e-mail com retry e backoff exponencial
+    # Send email with retry and exponential backoff
     $maxRetries = 5
     $retryCount = 0
     $delay = 1
@@ -128,21 +128,21 @@ Function Send-Mail {
         while ($retryCount -lt $maxRetries) {
             try {
                 $smtpClient.Send($mailMessage)
-                Write-Verbose "E-mail enviado com sucesso."
+                Write-Verbose "Email sent successfully."
                 return
             } catch {
                 $retryCount++
                 if ($retryCount -ge $maxRetries) {
-                    Write-Error "Erro ao enviar e-mail após $maxRetries tentativas: $_"
+                    Write-Error "Failed to send email after $maxRetries attempts: $_"
                     return
                 }
-                Write-Warning "Erro ao enviar e-mail: $_. Tentando novamente em $delay segundos..."
+                Write-Warning "Failed to send email: $_. Retrying in $delay seconds..."
                 Start-Sleep -Seconds $delay
                 $delay *= 2
             }
         }
     } finally {
-        # Liberar recursos (MailMessage.Dispose() também libera os Attachments)
+        # Release resources (MailMessage.Dispose() also releases Attachments)
         $mailMessage.Dispose()
         $smtpClient.Dispose()
     }
