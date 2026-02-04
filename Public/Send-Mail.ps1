@@ -75,9 +75,9 @@ Function Send-Mail {
         return
     }
 
-    $smtpServer = $env:SMTP_SERVER ?? "smtp.gmail.com"
-    $smtpPort = $env:SMTP_PORT ?? 587
-    $smtpFrom = $env:SMTP_FROM ?? $smtpUser    
+    $smtpServer = if ($env:SMTP_SERVER) { $env:SMTP_SERVER } else { "smtp.gmail.com" }
+    $smtpPort = if ($env:SMTP_PORT) { $env:SMTP_PORT } else { 587 }
+    $smtpFrom = if ($env:SMTP_FROM) { $env:SMTP_FROM } else { $smtpUser }    
     if ([string]::IsNullOrWhiteSpace($FromName)) { $FromName = $env:COMPUTERNAME }
             
     # O To opcional... aparentemente o PowerShell converte os $null de string para "" automaticamente, o que faz com que ?? falhe
@@ -102,15 +102,12 @@ Function Send-Mail {
     $mailMessage.Subject = $Subject
     $mailMessage.Body = $Body
     $mailMessage.IsBodyHtml = $IsHtml
+    $mailMessage.Headers.Add("X-Mailer", "ElektoMailPosh/0.2.0")
 
     # Validar e adicionar anexos
-    $attachmentObjects = @()
     foreach ($attachmentPath in $Attachments) {
         if (-not (Test-Path -Path $attachmentPath -PathType Leaf)) {
-            # Limpar recursos já criados antes de sair
-            foreach ($att in $attachmentObjects) {
-                $att.Dispose()
-            }
+            # Limpar recursos já criados antes de sair (Dispose libera os attachments já adicionados)
             $mailMessage.Dispose()
             $smtpClient.Dispose()
             Write-Error "O arquivo de anexo não foi encontrado: '$attachmentPath'"
@@ -119,7 +116,6 @@ Function Send-Mail {
         $fullPath = (Resolve-Path -Path $attachmentPath).Path
         $attachment = New-Object System.Net.Mail.Attachment($fullPath)
         $mailMessage.Attachments.Add($attachment)
-        $attachmentObjects += $attachment
         Write-Verbose "Anexo adicionado: $fullPath"
     }
 
@@ -146,10 +142,7 @@ Function Send-Mail {
             }
         }
     } finally {
-        # Liberar recursos dos anexos e da mensagem
-        foreach ($att in $attachmentObjects) {
-            $att.Dispose()
-        }
+        # Liberar recursos (MailMessage.Dispose() também libera os Attachments)
         $mailMessage.Dispose()
         $smtpClient.Dispose()
     }
