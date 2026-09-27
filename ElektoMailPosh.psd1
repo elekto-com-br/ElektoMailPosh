@@ -12,7 +12,7 @@
 RootModule = 'ElektoMailPosh.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.2.0'
+ModuleVersion = '0.2.1'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -110,6 +110,9 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
+## 0.2.1
+- Fixed empty default sender display name (-FromName) on Linux and macOS: now uses [Environment]::MachineName instead of $env:COMPUTERNAME
+
 ## 0.2.0
 - Added file attachments support (-Attachments parameter)
 - Added automatic retry with exponential backoff

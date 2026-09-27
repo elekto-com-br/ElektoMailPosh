@@ -16,7 +16,7 @@ The email body content. This parameter is required.
 Indicates whether the body is HTML formatted. Default is $False.
 
 .PARAMETER FromName
-The sender display name. If not provided, uses the machine name.
+The sender display name. If not provided, uses the machine name ([Environment]::MachineName).
 
 .PARAMETER To
 The recipient email address. If not provided, uses the SMTP_TO environment variable.
@@ -78,7 +78,7 @@ Function Send-Mail {
     $smtpServer = if ($env:SMTP_SERVER) { $env:SMTP_SERVER } else { "smtp.gmail.com" }
     $smtpPort = if ($env:SMTP_PORT) { $env:SMTP_PORT } else { 587 }
     $smtpFrom = if ($env:SMTP_FROM) { $env:SMTP_FROM } else { $smtpUser }
-    if ([string]::IsNullOrWhiteSpace($FromName)) { $FromName = $env:COMPUTERNAME }
+    if ([string]::IsNullOrWhiteSpace($FromName)) { $FromName = [Environment]::MachineName }
 
     # Optional To parameter - PowerShell converts null strings to "" automatically
     if ([string]::IsNullOrWhiteSpace($To)) { $To = $env:SMTP_TO }
@@ -102,7 +102,7 @@ Function Send-Mail {
     $mailMessage.Subject = $Subject
     $mailMessage.Body = $Body
     $mailMessage.IsBodyHtml = $IsHtml
-    $mailMessage.Headers.Add("X-Mailer", "ElektoMailPosh/0.2.0")
+    $mailMessage.Headers.Add("X-Mailer", "ElektoMailPosh/0.2.1")
 
     # Validate and add attachments
     foreach ($attachmentPath in $Attachments) {
