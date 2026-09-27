@@ -112,6 +112,8 @@ PrivateData = @{
         ReleaseNotes = @'
 ## 0.2.1
 - Fixed empty default sender display name (-FromName) on Linux and macOS: now uses [Environment]::MachineName instead of $env:COMPUTERNAME
+- X-Mailer header now reads the version from the module manifest
+- Module loader builds the Public path with Join-Path instead of a hard-coded backslash
 
 ## 0.2.0
 - Added file attachments support (-Attachments parameter)

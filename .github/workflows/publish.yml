@@ -1,0 +1,36 @@
+name: Publish to PowerShell Gallery
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  publish:
+    name: Validate & Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: Install-PSResource -Name PSScriptAnalyzer -Repository PSGallery -TrustRepository -Quiet
+
+      # Parses every script, validates the manifest (and that it matches the tag),
+      # runs PSScriptAnalyzer, imports the module and stages ./out/ElektoMailPosh.
+      - name: Validate and stage
+        shell: pwsh
+        run: ./Build.ps1 -ExpectedVersion $env:VERSION
+
+      - name: Publish
+        shell: pwsh
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: |
+          if (-not $env:PSGALLERY_API_KEY) { throw "Secret PSGALLERY_API_KEY is not set." }
+          Publish-PSResource -Path ./out/ElektoMailPosh -Repository PSGallery -ApiKey $env:PSGALLERY_API_KEY

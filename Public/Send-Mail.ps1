@@ -102,7 +102,7 @@ Function Send-Mail {
     $mailMessage.Subject = $Subject
     $mailMessage.Body = $Body
     $mailMessage.IsBodyHtml = $IsHtml
-    $mailMessage.Headers.Add("X-Mailer", "ElektoMailPosh/0.2.1")
+    $mailMessage.Headers.Add("X-Mailer", "ElektoMailPosh/$($MyInvocation.MyCommand.Module.Version)")
 
     # Validate and add attachments
     foreach ($attachmentPath in $Attachments) {
