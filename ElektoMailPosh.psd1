@@ -12,7 +12,7 @@
 RootModule = 'ElektoMailPosh.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.2.1'
+ModuleVersion = '1.0.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -110,6 +110,13 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
+## 1.0.0
+- Added -Cc and -Bcc parameters (defaults: SMTP_CC and SMTP_BCC environment variables)
+- -To now accepts multiple addresses (array or comma-separated list, also in SMTP_TO)
+- Added SMTP_FROM_NAME environment variable as the default sender display name
+- Body can come from the pipeline; piped lines are joined and sent as a single email
+- Added -Priority parameter (Low, Normal, High)
+
 ## 0.2.1
 - Fixed empty default sender display name (-FromName) on Linux and macOS: now uses [Environment]::MachineName instead of $env:COMPUTERNAME
 - X-Mailer header now reads the version from the module manifest

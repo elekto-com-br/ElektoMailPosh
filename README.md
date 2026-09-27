@@ -40,7 +40,10 @@ Set SMTP credentials via environment variables. This keeps secrets out of your s
 | `SMTP_SERVER` | No | `smtp.gmail.com` | SMTP server address |
 | `SMTP_PORT` | No | `587` | SMTP server port |
 | `SMTP_FROM` | No | `SMTP_USER` | Sender email address |
-| `SMTP_TO` | No | - | Default recipient (fallback) |
+| `SMTP_FROM_NAME` | No | Machine name | Sender display name |
+| `SMTP_TO` | No | - | Default recipients (comma-separated) |
+| `SMTP_CC` | No | - | Default carbon copy recipients (comma-separated) |
+| `SMTP_BCC` | No | - | Default blind carbon copy recipients (comma-separated) |
 
 ## Usage
 
@@ -62,10 +65,30 @@ Send-Mail -Subject "Alert" -Body "<h1>Alert</h1><p>Check the logs.</p>" -IsHtml 
 Send-Mail -Subject "Report" -Body "Please find the files attached." -To "recipient@example.com" -Attachments @("./report.pdf", "./data.xlsx")
 ```
 
+### Multiple Recipients, Cc and Bcc
+
+```powershell
+Send-Mail -Subject "Status" -Body "All good." -To "a@example.com", "b@example.com" -Cc "c@example.com" -Bcc "audit@example.com"
+```
+
+### High Priority
+
+```powershell
+Send-Mail -Subject "Disk almost full" -Body "Only 2% free on /data." -Priority High
+```
+
+### Body from the Pipeline
+
+Piped lines are joined into a single body and sent as one email:
+
+```powershell
+Get-Content ./build.log | Send-Mail -Subject "Build failed" -To "team@example.com"
+```
+
 ### Using Environment Defaults
 
 ```powershell
-# When SMTP_TO is set, you can omit -To
+# When SMTP_TO is set, you can omit -To (likewise SMTP_CC, SMTP_BCC and SMTP_FROM_NAME)
 Send-Mail -Subject "Deployment Complete" -Body "Build #123 deployed successfully."
 ```
 
@@ -142,10 +165,13 @@ notify:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `-Subject` | String | Yes | - | Email subject line |
-| `-Body` | String | Yes | - | Email body (plain text or HTML) |
-| `-To` | String | No | `$env:SMTP_TO` | Recipient email address |
+| `-Body` | String | Yes | - | Email body (plain text or HTML); accepts pipeline input |
+| `-To` | String[] | No | `$env:SMTP_TO` | Recipient email addresses |
+| `-Cc` | String[] | No | `$env:SMTP_CC` | Carbon copy addresses |
+| `-Bcc` | String[] | No | `$env:SMTP_BCC` | Blind carbon copy addresses |
 | `-IsHtml` | Bool | No | `$false` | Set to `$true` for HTML body |
-| `-FromName` | String | No | Machine name | Sender display name |
+| `-FromName` | String | No | `$env:SMTP_FROM_NAME`, then machine name | Sender display name |
+| `-Priority` | String | No | `Normal` | `Low`, `Normal` or `High` |
 | `-Attachments` | String[] | No | `@()` | Array of file paths to attach |
 
 ## Troubleshooting
