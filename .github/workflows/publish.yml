@@ -5,13 +5,20 @@ on:
     tags:
       - 'v*.*.*'
 
+permissions:
+  contents: read
+
 jobs:
-  publish:
-    name: Validate & Publish
+  # Everything that runs third-party code (PSScriptAnalyzer) runs here, without the Gallery API key
+  build:
+    name: Validate & Stage
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      # Actions are pinned by commit, the tool by exact version: nothing new runs here unreviewed
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Extract version from tag
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
@@ -19,13 +26,34 @@ jobs:
 
       - name: Install PSScriptAnalyzer
         shell: pwsh
-        run: Install-PSResource -Name PSScriptAnalyzer -Repository PSGallery -TrustRepository -Quiet
+        run: Install-PSResource -Name PSScriptAnalyzer -Version '[1.25.0]' -Repository PSGallery -TrustRepository -Quiet
 
       # Parses every script, validates the manifest (and that it matches the tag),
       # runs PSScriptAnalyzer, imports the module and stages ./out/ElektoMailPosh.
       - name: Validate and stage
         shell: pwsh
         run: ./Build.ps1 -ExpectedVersion $env:VERSION
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package
+          path: out/ElektoMailPosh
+          if-no-files-found: error
+          retention-days: 7
+
+  # The API key exists only here, in a job that installs nothing: it takes the staged package and
+  # publishes it with PSResourceGet, which ships with PowerShell
+  publish:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    permissions: {}
+
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package
+          path: out/ElektoMailPosh
 
       - name: Publish
         shell: pwsh
