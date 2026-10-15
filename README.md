@@ -22,6 +22,10 @@ A lightweight PowerShell module for sending emails via SMTP. **Zero dependencies
 Install-Module -Name ElektoMailPosh
 ```
 
+### From a Release (No Gallery Access)
+
+Each version has a [release](https://github.com/elekto-com-br/ElektoMailPosh/releases) with the package as `ElektoMailPosh-<version>.zip`: extract it into a folder listed in `$env:PSModulePath`.
+
 ### From Source
 
 ```powershell
