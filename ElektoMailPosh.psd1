@@ -12,7 +12,7 @@
 RootModule = 'ElektoMailPosh.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.0.0'
+ModuleVersion = '1.0.1'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -27,7 +27,7 @@ Author = 'JP Negri'
 CompanyName = 'Elekto Produtos Financeiros'
 
 # Copyright statement for this module
-Copyright = '(c) JP Negri. All rights reserved.'
+Copyright = '(c) 2024 Elekto Produtos Financeiros. Licensed under the MIT License.'
 
 # Description of the functionality provided by this module
 Description = 'Lightweight SMTP email module for PowerShell. Zero dependencies, environment-based configuration, automatic retry with exponential backoff. Perfect for CI/CD pipelines, automation scripts, and scheduled tasks.'
@@ -110,6 +110,9 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
+## 1.0.1
+- The copyright in the manifest names Elekto Produtos Financeiros, as the LICENSE does
+
 ## 1.0.0
 - Added -Cc and -Bcc parameters (defaults: SMTP_CC and SMTP_BCC environment variables)
 - -To now accepts multiple addresses (array or comma-separated list, also in SMTP_TO)
