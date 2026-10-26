@@ -117,6 +117,7 @@ PrivateData = @{
 - Set-MailAccount -FromEnvironment moves a configuration in SMTP_* environment variables to an account
 - Added -ReplyTo parameter (default: the account's ReplyTo or the SMTP_REPLY_TO environment variable)
 - Added -BodyFile parameter, for long messages: the body is read from a UTF-8 file, and an .html or .htm file is sent as HTML
+- Added -MessageId, -InReplyTo and -References parameters, so a follow-up (an alert and then its resolution, or a reply) shows in the same conversation
 - A sender display name with commas or quotes no longer breaks the From header
 
 ## 1.0.1

@@ -45,6 +45,21 @@ One or more blind carbon copy addresses. If not provided, uses the Bcc of the ac
 One or more addresses that replies should go to, instead of the sender. If not provided, uses the
 ReplyTo of the account (or SMTP_REPLY_TO).
 
+.PARAMETER MessageId
+The Message-ID of this email, such as "<backup-2026-10-26@host.example.com>" (the angle brackets are
+added when missing). Give one to answer this email later with -InReplyTo. If not provided, the server
+assigns one.
+
+.PARAMETER InReplyTo
+The Message-ID of the email this one answers. With it, mail clients (Gmail included) show both in the
+same conversation, as long as the subject is the same, "Re: " in front or not. It also goes to the
+References header.
+
+.PARAMETER References
+The Message-IDs of the conversation, oldest first, for a reply in a longer thread: the References of
+the email answered (its header may be passed as it is). The -InReplyTo is added at the end. If not
+provided, the References is just the -InReplyTo.
+
 .PARAMETER Priority
 The email priority: Low, Normal or High. Default is Normal.
 
@@ -95,6 +110,12 @@ Sends the HTML in report.html as the email body, with the report attached.
 Send-Mail -Account work -Subject "Maintenance tonight" -Body "..." -To "a@example.com", "b@example.com" -ReplyTo "support@example.com"
 
 Sends from the account "work", with replies going to support@example.com instead of the sender.
+
+.EXAMPLE
+Send-Mail -Subject "Backup failed on host" -Body "..." -MessageId "<backup-20261026@host.example.com>"
+Send-Mail -Subject "Re: Backup failed on host" -Body "Fixed." -InReplyTo "<backup-20261026@host.example.com>"
+
+Sends an alert and, later, a follow-up that mail clients show in the same conversation.
 #>
 Function Send-Mail {
     [CmdletBinding(DefaultParameterSetName = 'Body')]
@@ -118,6 +139,9 @@ Function Send-Mail {
         [string[]]$Cc = @(),
         [string[]]$Bcc = @(),
         [string[]]$ReplyTo = @(),
+        [string]$MessageId = $null,
+        [string]$InReplyTo = $null,
+        [string[]]$References = @(),
 
         [ValidateSet('Low', 'Normal', 'High')]
         [string]$Priority = 'Normal',
@@ -134,6 +158,13 @@ Function Send-Mail {
             $list = ConvertTo-AddressList $Addresses
             if ($list.Count -eq 0) { $list = ConvertTo-AddressList $Defaults }
             return ,$list
+        }
+
+        # A Message-ID in angle brackets (added when missing), or $null when the value is not one
+        function ConvertTo-MessageId([string]$Value) {
+            $id = $Value.Trim() -replace '^<(.*)>$', '$1'
+            if ($id -notmatch '^[^\s<>@]+@[^\s<>@]+$') { return $null }
+            return "<$id>"
         }
     }
 
@@ -189,7 +220,23 @@ Function Send-Mail {
             return
         }
 
-        Write-Debug "Configuration: ACCOUNT='$($settings.Account)', SMTP_SERVER='$smtpServer', SMTP_PORT='$smtpPort', SMTP_FROM='$smtpFrom', FROM_NAME='$FromName', SMTP_USER='$smtpUser', PASSWORD from '$($settings.PasswordSource)', TO='$To', CC='$Cc', BCC='$Bcc', REPLY_TO='$ReplyTo'."
+        # Message-ID, and In-Reply-To with References, which put this email in the conversation it answers.
+        # References may come as the header of the email answered: IDs separated by spaces.
+        $referenceValues = @($References -split '[\s,]+' | Where-Object { $_ })
+        foreach ($value in @($MessageId, $InReplyTo | Where-Object { $_ }) + $referenceValues) {
+            if (-not (ConvertTo-MessageId $value)) {
+                Write-Error "Not a Message-ID: '$value'. Expected <id@domain>."
+                return
+            }
+        }
+        if ($MessageId) { $MessageId = ConvertTo-MessageId $MessageId }
+        $referenceIds = @($referenceValues | ForEach-Object { ConvertTo-MessageId $_ })
+        if ($InReplyTo) {
+            $InReplyTo = ConvertTo-MessageId $InReplyTo
+            if ($referenceIds -notcontains $InReplyTo) { $referenceIds += $InReplyTo }
+        }
+
+        Write-Debug "Configuration: ACCOUNT='$($settings.Account)', SMTP_SERVER='$smtpServer', SMTP_PORT='$smtpPort', SMTP_FROM='$smtpFrom', FROM_NAME='$FromName', SMTP_USER='$smtpUser', PASSWORD from '$($settings.PasswordSource)', TO='$To', CC='$Cc', BCC='$Bcc', REPLY_TO='$ReplyTo', MESSAGE_ID='$MessageId', IN_REPLY_TO='$InReplyTo', REFERENCES='$referenceIds'."
         Write-Verbose "Sending email to '$($To -join ', ')' with subject '$Subject'..."
 
         # SMTP client configuration
@@ -204,6 +251,9 @@ Function Send-Mail {
         foreach ($address in $Cc) { $mailMessage.CC.Add($address) }
         foreach ($address in $Bcc) { $mailMessage.Bcc.Add($address) }
         foreach ($address in $ReplyTo) { $mailMessage.ReplyToList.Add($address) }
+        if ($MessageId) { $mailMessage.Headers['Message-ID'] = $MessageId }
+        if ($InReplyTo) { $mailMessage.Headers['In-Reply-To'] = $InReplyTo }
+        if ($referenceIds.Count -gt 0) { $mailMessage.Headers['References'] = $referenceIds -join ' ' }
         $mailMessage.Subject = $Subject
         $mailMessage.Body = $Body
         $mailMessage.IsBodyHtml = $IsHtml

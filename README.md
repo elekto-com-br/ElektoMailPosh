@@ -171,6 +171,17 @@ Useful for an email to many people, so that the answers go to a team mailbox ins
 Send-Mail -Account work -Subject "Security update" -Body "..." -Bcc $clients -ReplyTo "support@example.com"
 ```
 
+### Replying in a Thread
+
+Mail clients, Gmail included, show an email in the conversation of another when it has the same subject (with `Re: ` or not) and its `In-Reply-To` names the other's `Message-ID`. Give the first email a `Message-ID` of your own to answer it later, as in an alert followed by its resolution:
+
+```powershell
+Send-Mail -Subject "Backup failed on host" -Body "..." -MessageId "<backup-20261026@host.example.com>"
+Send-Mail -Subject "Re: Backup failed on host" -Body "Fixed." -InReplyTo "<backup-20261026@host.example.com>"
+```
+
+To answer an email deeper in a conversation, pass its `References` header as it is with `-References`; the `-InReplyTo` is added at the end.
+
 ### High Priority
 
 ```powershell
@@ -280,6 +291,9 @@ notify:
 | `-Cc` | String[] | No | The account's `Cc`, or `$env:SMTP_CC` | Carbon copy addresses |
 | `-Bcc` | String[] | No | The account's `Bcc`, or `$env:SMTP_BCC` | Blind carbon copy addresses |
 | `-ReplyTo` | String[] | No | The account's `ReplyTo`, or `$env:SMTP_REPLY_TO` | Addresses replies should go to |
+| `-MessageId` | String | No | Assigned by the server | `Message-ID` of this email, to answer it later |
+| `-InReplyTo` | String | No | - | `Message-ID` of the email answered, to show this one in its conversation |
+| `-References` | String[] | No | The `-InReplyTo` | `Message-ID`s of the conversation, oldest first |
 | `-IsHtml` | Bool | No | `$false` (`$true` for an HTML `-BodyFile`) | Set to `$true` for HTML body |
 | `-FromName` | String | No | The account's `FromName`, or `$env:SMTP_FROM_NAME`, then machine name | Sender display name |
 | `-Priority` | String | No | `Normal` | `Low`, `Normal` or `High` |
