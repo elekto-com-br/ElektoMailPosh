@@ -107,7 +107,7 @@ Function Set-MailAccount {
     $existingName = Find-AccountName $file $Name
     if ($existingName) { $Name = $existingName }
     $settings = [ordered]@{}
-    if ($existingName) { foreach ($key in $accounts[$Name].Keys) { $settings[$key] = $accounts[$Name][$key] } }
+    if ($existingName) { foreach ($key in $accounts[$Name].psbase.Keys) { $settings[$key] = $accounts[$Name][$key] } }
 
     $secret = $null
     if ($FromEnvironment) {

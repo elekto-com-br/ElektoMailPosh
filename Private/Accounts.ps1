@@ -8,11 +8,18 @@ $script:AccountNamePattern = '^[A-Za-z0-9][A-Za-z0-9_.-]*$'
 $script:DefaultServer = 'smtp.gmail.com'
 $script:DefaultPort = 587
 
+# Account names are keys of dictionaries, where PowerShell gives a key precedence over a property of the
+# same name: an account called "Keys" would hide .Keys. So the names are always listed with .psbase.Keys.
+
 # The folder of accounts.json (and, outside Windows, of the password files): SMTP_CONFIG_DIR, or else
 # ElektoMailPosh in the user's configuration folder (%APPDATA% on Windows, ~/.config elsewhere)
 function Get-AccountDirectory {
-    if ($env:SMTP_CONFIG_DIR) { return $env:SMTP_CONFIG_DIR }
-    return Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'ElektoMailPosh'
+    # A relative SMTP_CONFIG_DIR is resolved here against the current location: the .NET file calls that
+    # keep the passwords would resolve it against the process folder, which Set-Location does not change
+    if ($env:SMTP_CONFIG_DIR) { return $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($env:SMTP_CONFIG_DIR) }
+    # Without DoNotVerify, a folder that does not exist yet (~/.config of a new Linux user, a container)
+    # comes back as '', and even sending by the SMTP_* variables would fail
+    return Join-Path ([Environment]::GetFolderPath('ApplicationData', 'DoNotVerify')) 'ElektoMailPosh'
 }
 
 function Get-AccountFilePath {
@@ -53,7 +60,7 @@ function Read-AccountFile {
     }
     if ($null -eq $data) { $data = @{} }
     if ($data -isnot [System.Collections.IDictionary]) { throw "The accounts file '$path' must hold a JSON object." }
-    foreach ($key in $data.Keys) {
+    foreach ($key in $data.psbase.Keys) {
         if ($key -notin 'Default', 'Accounts') { throw "Unknown key '$key' in the accounts file '$path'." }
     }
 
@@ -91,7 +98,7 @@ function Read-AccountFile {
 
     $default = $data.Default
     if ($default) {
-        $match = @($accounts.Keys | Where-Object { $_ -eq $default })
+        $match = @($accounts.psbase.Keys | Where-Object { $_ -eq $default })
         if (-not $match) { throw "The default account '$default' is not one of the accounts in '$path'." }
         $default = $match[0]
     } else {
@@ -107,7 +114,7 @@ function Write-AccountFile([string]$Default, [System.Collections.IDictionary]$Ac
     $data = [ordered]@{}
     if ($Default) { $data.Default = $Default }
     $data.Accounts = [ordered]@{}
-    foreach ($name in $Accounts.Keys) {
+    foreach ($name in $Accounts.psbase.Keys) {
         $settings = [ordered]@{}
         foreach ($key in $script:AccountSettingNames) {
             $value = $Accounts[$name][$key]
@@ -124,14 +131,15 @@ function Write-AccountFile([string]$Default, [System.Collections.IDictionary]$Ac
         $data.Accounts[$name] = $settings
     }
 
-    New-Item -ItemType Directory -Path (Split-Path -Path $path) -Force | Out-Null
-    Set-Content -LiteralPath $path -Value ($data | ConvertTo-Json -Depth 5) -Encoding utf8NoBOM
+    # A failure stops the caller here, before it stores or deletes a password that would then not match
+    New-Item -ItemType Directory -Path (Split-Path -Path $path) -Force -ErrorAction Stop | Out-Null
+    Set-Content -LiteralPath $path -Value ($data | ConvertTo-Json -Depth 5) -Encoding utf8NoBOM -ErrorAction Stop
 }
 
 # The name of an account as the file spells it, or $null when the file has no such account
 function Find-AccountName($File, [string]$Name) {
     if (-not $File) { return $null }
-    return @($File.Accounts.Keys | Where-Object { $_ -eq $Name })[0]
+    return @($File.Accounts.psbase.Keys | Where-Object { $_ -eq $Name })[0]
 }
 
 # The settings Send-Mail uses: those of the account given, or of the default account of the file, or
@@ -150,7 +158,7 @@ function Resolve-MailConfiguration([string]$Account) {
 
     if (-not $file) { throw "There is no account '$Account': the accounts file '$(Get-AccountFilePath)' does not exist." }
     $name = Find-AccountName $file $Account
-    if (-not $name) { throw "There is no account '$Account' in '$($file.Path)'. Accounts: $($file.Accounts.Keys -join ', ')." }
+    if (-not $name) { throw "There is no account '$Account' in '$($file.Path)'. Accounts: $($file.Accounts.psbase.Keys -join ', ')." }
 
     $password = Get-AccountPassword $name
     if (-not $password) { throw (Get-MissingPasswordMessage $name) }
