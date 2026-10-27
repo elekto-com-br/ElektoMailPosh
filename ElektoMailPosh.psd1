@@ -27,7 +27,7 @@ Author = 'JP Negri'
 CompanyName = 'Elekto Produtos Financeiros'
 
 # Copyright statement for this module
-Copyright = '(c) 2024 Elekto Produtos Financeiros. Licensed under the MIT License.'
+Copyright = '(c) 2024-2026 Elekto Produtos Financeiros. Licensed under the MIT License.'
 
 # Description of the functionality provided by this module
 Description = 'Lightweight SMTP email module for PowerShell. Zero dependencies, several sending accounts like msmtp (passwords in the Windows Credential Manager or an owner-only file) or environment-based configuration, automatic retry with exponential backoff. Perfect for CI/CD pipelines, automation scripts, and scheduled tasks.'
