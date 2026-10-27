@@ -1,0 +1,62 @@
+# The public interface of ElektoMailPosh, written by Tests/Get-PublicInterface.ps1. Tests/PublicInterface.Tests.ps1
+# fails when the module differs from it: regenerate it only for a change made on purpose.
+
+Get-MailAccount
+  __AllParameterSets
+    -Name String, position 0, SupportsWildcards, default '*'
+
+Remove-MailAccount
+  __AllParameterSets
+    -Name String[], position 0, mandatory, from the pipeline, from the pipeline by property name, SupportsWildcards
+    -Confirm SwitchParameter, alias cf
+    -WhatIf SwitchParameter, alias wi
+
+Send-Mail
+  Body (default)
+    -Subject String, position 0, mandatory, ValidateNotNullOrEmpty
+    -Body String, position 1, mandatory, from the pipeline, AllowEmptyString
+    -IsHtml Boolean, position 2, default $False
+    -FromName String, position 3, default $null
+    -To String[], position 4, default @()
+    -Cc String[], position 5, default @()
+    -Bcc String[], position 6, default @()
+    -Priority String, position 7, ValidateSet(Low, Normal, High), default 'Normal'
+    -Attachments String[], position 8, default @()
+    -Account String, default $null
+    -InReplyTo String, default $null
+    -MessageId String, default $null
+    -References String[], default @()
+    -ReplyTo String[], default @()
+  BodyFile
+    -Subject String, position 0, mandatory, ValidateNotNullOrEmpty
+    -IsHtml Boolean, position 2, default $False
+    -FromName String, position 3, default $null
+    -To String[], position 4, default @()
+    -Cc String[], position 5, default @()
+    -Bcc String[], position 6, default @()
+    -Priority String, position 7, ValidateSet(Low, Normal, High), default 'Normal'
+    -Attachments String[], position 8, default @()
+    -Account String, default $null
+    -BodyFile String, mandatory, ValidateNotNullOrEmpty
+    -InReplyTo String, default $null
+    -MessageId String, default $null
+    -References String[], default @()
+    -ReplyTo String[], default @()
+
+Set-MailAccount
+  __AllParameterSets
+    -Name String, position 0, mandatory, ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
+    -Bcc String[]
+    -Cc String[]
+    -Confirm SwitchParameter, alias cf
+    -Default SwitchParameter
+    -From String
+    -FromEnvironment SwitchParameter
+    -FromName String
+    -Password SecureString
+    -Port Int32, ValidateRange(1, 65535)
+    -ReplyTo String[]
+    -Server String
+    -To String[]
+    -User String
+    -WhatIf SwitchParameter, alias wi
