@@ -42,7 +42,7 @@ Import-Module ./ElektoMailPosh/ElektoMailPosh.psd1
 There are two ways to configure the SMTP settings:
 
 - **Accounts**: named sets of settings, like the accounts of msmtp, for machines that send from more than one mailbox. Best for workstations and servers.
-- **Environment variables**: one set of settings, for CI/CD pipelines and containers.
+- **Environment variables**: one set of settings, for CI/CD pipelines, containers and machines that send from a single account.
 
 When an account is in use (given with `-Account`, or the default account), the `SMTP_*` environment variables are ignored.
 
@@ -97,9 +97,13 @@ On any platform, the environment variable `SMTP_PASS_<ACCOUNT>` (the account nam
 
 On Windows the credential can also be stored or seen with the system tools: `cmdkey /generic:ElektoMailPosh:work /user:me@example.com /pass` asks for the password, and the credentials appear in Control Panel > Credential Manager > Windows Credentials.
 
-#### Upgrading from Environment Variables
+#### Upgrading from 1.x
 
-`-FromEnvironment` moves the configuration in the `SMTP_*` variables, password included, to an account:
+Updating the module is all it takes (`Update-PSResource ElektoMailPosh`, or `Update-Module ElektoMailPosh`): with no default account, `Send-Mail` reads the `SMTP_*` environment variables as before. CI/CD pipelines, containers and machines that send from a single account need nothing else.
+
+A second mailbox doesn't require moving the first one either: an account created without `-Default` is used only with `-Account`, and `Send-Mail` without it keeps reading the variables.
+
+To move the configuration to an account anyway, `-FromEnvironment` copies the `SMTP_*` variables, password included:
 
 ```powershell
 Set-MailAccount -Name automation -FromEnvironment -Default
@@ -109,11 +113,14 @@ From then on `Send-Mail` uses that account and ignores the variables, so remove 
 
 ```powershell
 foreach ($name in 'SMTP_SERVER', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM', 'SMTP_FROM_NAME', 'SMTP_TO', 'SMTP_CC', 'SMTP_BCC') {
-    [Environment]::SetEnvironmentVariable($name, $null, 'User')
+    [Environment]::SetEnvironmentVariable($name, $null, 'User')   # 'Machine', from an elevated shell, for variables set for the whole machine
 }
 ```
 
 On Linux and macOS, remove them from wherever they are set (shell profile, PowerShell profile, systemd unit).
+
+> [!WARNING]
+> **Scheduled tasks and services:** check how they run before moving them to an account. Accounts and their passwords belong to the user who created them, so a task or service that runs as another user (SYSTEM, a service account, root) doesn't see them. On Windows, a scheduled task set to run whether the user is logged on or not with *Do not store password* (logon type S4U) runs as you but can't read the Credential Manager, which needs your logon password to decrypt. Senders like these should stay on the `SMTP_*` variables: don't make an account the default, and leave the variables where the task reads them (often at machine level).
 
 ### Environment Variables
 
