@@ -86,6 +86,8 @@ The settings are kept in `accounts.json`, in the folder `ElektoMailPosh` of your
 }
 ```
 
+The file is read ignoring case, as PowerShell reads names: keys and settings can be written in any case, and `Send-Mail -Account WORK` sends from the account `work`. So two accounts whose names differ only in case are refused, since they would be the same account and share its password.
+
 #### Where the passwords go
 
 | Platform | Store | Protection |

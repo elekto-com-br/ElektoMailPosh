@@ -12,7 +12,7 @@
 RootModule = 'ElektoMailPosh.psm1'
 
 # Version number of this module.
-ModuleVersion = '2.0.2'
+ModuleVersion = '2.0.3'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Core')
@@ -110,6 +110,10 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
+## 2.0.3
+- accounts.json is read ignoring case, as account names already were: "default" and "accounts" written in lower case were taken for an empty file, and Send-Mail went back to the SMTP_* environment variables without a word
+- Two accounts whose names differ only in case, or a key or setting written twice in different case, are an error; before, one of them was dropped without a word
+
 ## 2.0.2
 - Send-Mail takes its parameters by position again, in the order of 1.x (Subject, Body, IsHtml, FromName, To, Cc, Bcc, Priority, Attachments), so scripts written for 1.x, such as Send-Mail $subject $body $true, work unchanged; 2.0.0 and 2.0.1 took them only by name. The parameters added in 2.0 take names only
 - Tests, run with Pester before each release, call Send-Mail the way scripts written for 1.x do
