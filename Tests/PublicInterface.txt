@@ -8,7 +8,7 @@ Get-MailAccount
 Remove-MailAccount
   __AllParameterSets
     -Name String[], position 0, mandatory, from the pipeline, from the pipeline by property name, SupportsWildcards
-    -Confirm SwitchParameter, alias cf
+    -Confirm SwitchParameter, alias cf, ConfirmImpact Medium
     -WhatIf SwitchParameter, alias wi
 
 Send-Mail
@@ -48,7 +48,7 @@ Set-MailAccount
     -Name String, position 0, mandatory, ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
     -Bcc String[]
     -Cc String[]
-    -Confirm SwitchParameter, alias cf
+    -Confirm SwitchParameter, alias cf, ConfirmImpact Medium
     -Default SwitchParameter
     -From String
     -FromEnvironment SwitchParameter

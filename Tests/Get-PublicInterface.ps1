@@ -6,7 +6,9 @@ Writes the public interface of the module, as PublicInterface.txt records it.
 For each exported command and each of its parameter sets, one line per parameter: its type, position
 (none when it takes a name only), whether it is mandatory or comes from the pipeline, its validation
 attributes with all their arguments, and its default value. The common parameters are left out;
--WhatIf and -Confirm stay, as the sign of SupportsShouldProcess.
+-WhatIf and -Confirm stay, as the sign of SupportsShouldProcess, and -Confirm carries the
+ConfirmImpact of the command: when it reaches $ConfirmPreference (High by default), the command asks
+before it acts, and a script that nobody watches waits for an answer.
 
 PublicInterface.Tests.ps1 fails when the module differs from PublicInterface.txt. After a change to
 the interface made on purpose, regenerate the file and commit it with the change, so that the review
@@ -59,6 +61,7 @@ foreach ($command in Get-Command -Module $module.Name | Sort-Object Name) {
             Where-Object { $_ -is [System.Management.Automation.Language.AttributeAst] -and $_.TypeName.GetReflectionAttributeType() -notin [System.Management.Automation.ParameterAttribute], [System.Management.Automation.AliasAttribute] } |
             ForEach-Object { Format-Attribute $_ } | Sort-Object)
     }
+    $confirmImpact = ($command.ScriptBlock.Attributes | Where-Object { $_ -is [System.Management.Automation.CmdletBindingAttribute] }).ConfirmImpact
 
     ''
     $command.Name
@@ -76,6 +79,7 @@ foreach ($command in Get-Command -Module $module.Name | Sort-Object Name) {
             if ($parameter.ValueFromRemainingArguments) { $traits += 'remaining arguments' }
             if ($parameter.Aliases.Count -gt 0) { $traits += "alias $($parameter.Aliases -join ', ')" }
             if ($attributes.ContainsKey($parameter.Name)) { $traits += $attributes[$parameter.Name] }
+            if ($parameter.Name -eq 'Confirm') { $traits += "ConfirmImpact $confirmImpact" }
             if ($defaults.ContainsKey($parameter.Name)) { $traits += "default $($defaults[$parameter.Name])" }
             '    -' + $parameter.Name + ' ' + ($traits -join ', ')
         }
