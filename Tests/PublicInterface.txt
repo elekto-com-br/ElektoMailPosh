@@ -20,7 +20,7 @@ Send-Mail
     -To String[], position 4, default @()
     -Cc String[], position 5, default @()
     -Bcc String[], position 6, default @()
-    -Priority String, position 7, ValidateSet(Low, Normal, High), default 'Normal'
+    -Priority String, position 7, ValidateSet('Low', 'Normal', 'High'), default 'Normal'
     -Attachments String[], position 8, default @()
     -Account String, default $null
     -InReplyTo String, default $null
@@ -34,7 +34,7 @@ Send-Mail
     -To String[], position 4, default @()
     -Cc String[], position 5, default @()
     -Bcc String[], position 6, default @()
-    -Priority String, position 7, ValidateSet(Low, Normal, High), default 'Normal'
+    -Priority String, position 7, ValidateSet('Low', 'Normal', 'High'), default 'Normal'
     -Attachments String[], position 8, default @()
     -Account String, default $null
     -BodyFile String, mandatory, ValidateNotNullOrEmpty
