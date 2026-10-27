@@ -30,6 +30,7 @@ Function Get-MailAccount {
     [CmdletBinding()]
     param (
         [Parameter(Position = 0)]
+        [SupportsWildcards()]
         [string]$Name = '*'
     )
 
