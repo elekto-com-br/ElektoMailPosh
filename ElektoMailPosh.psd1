@@ -12,7 +12,7 @@
 RootModule = 'ElektoMailPosh.psm1'
 
 # Version number of this module.
-ModuleVersion = '2.0.1'
+ModuleVersion = '2.0.2'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Core')
@@ -110,6 +110,10 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
+## 2.0.2
+- Send-Mail takes its parameters by position again, in the order of 1.x (Subject, Body, IsHtml, FromName, To, Cc, Bcc, Priority, Attachments), so scripts written for 1.x, such as Send-Mail $subject $body $true, work unchanged; 2.0.0 and 2.0.1 took them only by name. The parameters added in 2.0 take names only
+- Tests, run with Pester before each release, call Send-Mail the way scripts written for 1.x do
+
 ## 2.0.1
 - Remove-MailAccount takes several names, wildcards and the accounts piped from Get-MailAccount; Remove-MailAccount * removes every account and its stored password, so Send-Mail goes back to the SMTP_* environment variables
 - The README says that upgrading from 1.x needs only the update, and warns that a Windows scheduled task set to "Do not store password" (S4U) cannot read the Credential Manager
