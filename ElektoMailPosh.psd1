@@ -12,10 +12,10 @@
 RootModule = 'ElektoMailPosh.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.0.1'
+ModuleVersion = '2.0.0'
 
 # Supported PSEditions
-# CompatiblePSEditions = @()
+CompatiblePSEditions = @('Core')
 
 # ID used to uniquely identify this module
 GUID = '663950f9-1b51-4cef-ad96-2ad771df86c7'
@@ -30,10 +30,10 @@ CompanyName = 'Elekto Produtos Financeiros'
 Copyright = '(c) 2024 Elekto Produtos Financeiros. Licensed under the MIT License.'
 
 # Description of the functionality provided by this module
-Description = 'Lightweight SMTP email module for PowerShell. Zero dependencies, environment-based configuration, automatic retry with exponential backoff. Perfect for CI/CD pipelines, automation scripts, and scheduled tasks.'
+Description = 'Lightweight SMTP email module for PowerShell. Zero dependencies, several sending accounts like msmtp (passwords in the Windows Credential Manager or an owner-only file) or environment-based configuration, automatic retry with exponential backoff. Perfect for CI/CD pipelines, automation scripts, and scheduled tasks.'
 
 # Minimum version of the PowerShell engine required by this module
-PowerShellVersion = '5.1'
+PowerShellVersion = '7.4'
 
 # Name of the PowerShell host required by this module
 # PowerShellHostName = ''
@@ -69,7 +69,7 @@ PowerShellVersion = '5.1'
 # NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = @('Send-Mail')
+FunctionsToExport = @('Send-Mail', 'Get-MailAccount', 'Set-MailAccount', 'Remove-MailAccount')
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = @()
@@ -98,7 +98,7 @@ PrivateData = @{
         Tags = @(
             'Email', 'SMTP', 'Mail', 'Send-Mail', 'Notification',
             'Automation', 'CI-CD', 'DevOps', 'GitHub-Actions', 'Azure-Pipelines',
-            'Lightweight', 'Simple', 'Environment-Variables', 'Cross-Platform',
+            'Lightweight', 'Simple', 'Environment-Variables', 'Accounts', 'Reply-To', 'Cross-Platform', 'PSEdition_Core',
             'Windows', 'Linux', 'macOS'
         )
 
@@ -110,6 +110,16 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
+## 2.0.0
+- Requires PowerShell 7.4 or later; Windows PowerShell 5.1 is no longer supported
+- Accounts, like those of msmtp: Set-MailAccount, Get-MailAccount and Remove-MailAccount keep named sets of SMTP settings (server, port, user, sender, default recipients), and Send-Mail -Account sends from one of them, or from the default account
+- Account passwords go to the Windows Credential Manager, or on Linux and macOS to a file only its owner can read; the SMTP_PASS_<ACCOUNT> environment variable takes precedence
+- Set-MailAccount -FromEnvironment moves a configuration in SMTP_* environment variables to an account
+- Added -ReplyTo parameter (default: the account's ReplyTo or the SMTP_REPLY_TO environment variable)
+- Added -BodyFile parameter, for long messages: the body is read from a UTF-8 file, and an .html or .htm file is sent as HTML
+- Added -MessageId, -InReplyTo and -References parameters, so a follow-up (an alert and then its resolution, or a reply) shows in the same conversation
+- A sender display name with commas or quotes no longer breaks the From header
+
 ## 1.0.1
 - The copyright in the manifest names Elekto Produtos Financeiros, as the LICENSE does
 

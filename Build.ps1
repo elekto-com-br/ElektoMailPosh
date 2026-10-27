@@ -5,7 +5,7 @@ Validates the module and stages the files that go to the PowerShell Gallery.
 .DESCRIPTION
 The PowerShell equivalent of "does it compile": every script is parsed for syntax errors,
 the manifest is validated, PSScriptAnalyzer runs (when installed) and the module is imported
-in a clean process to check that Send-Mail is exported. If everything passes, the package
+in a clean process to check that the public commands are exported. If everything passes, the package
 files are copied to ./out/ElektoMailPosh, ready for Publish-PSResource.
 
 Used by .github/workflows/publish.yml; can also be run locally before tagging.
@@ -26,7 +26,7 @@ param (
 $ErrorActionPreference = 'Stop'
 $moduleName = 'ElektoMailPosh'
 $manifestPath = Join-Path $PSScriptRoot "$moduleName.psd1"
-$packageFiles = @("$moduleName.psd1", "$moduleName.psm1", 'Public', 'LICENSE', 'README.md')
+$packageFiles = @("$moduleName.psd1", "$moduleName.psm1", 'Private', 'Public', 'LICENSE', 'README.md')
 
 # 1. Syntax: parse every PowerShell file
 $scripts = Get-ChildItem -Path $PSScriptRoot -Recurse -Include '*.ps1', '*.psm1', '*.psd1' |
@@ -57,9 +57,11 @@ if (Get-Module -ListAvailable PSScriptAnalyzer) {
     Write-Warning "PSScriptAnalyzer not installed; skipping static analysis."
 }
 
-# 4. Import in a clean process and check the exported command
+# 4. Import in a clean process and check that every public script exports its command
+$publicCommands = (Get-ChildItem -Path (Join-Path $PSScriptRoot 'Public') -Filter '*.ps1').BaseName -join "', '"
 $importCheck = "Import-Module '$manifestPath' -Force -ErrorAction Stop; " +
-    "if (-not (Get-Command Send-Mail -Module $moduleName -ErrorAction SilentlyContinue)) { throw 'Send-Mail not exported' }"
+    "foreach (`$command in '$publicCommands') { " +
+    "if (-not (Get-Command `$command -Module $moduleName -ErrorAction SilentlyContinue)) { throw `"`$command not exported`" } }"
 pwsh -NoProfile -NonInteractive -Command $importCheck
 if ($LASTEXITCODE -ne 0) { throw "Module import check failed." }
 Write-Host "Import OK."
