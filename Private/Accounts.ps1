@@ -49,19 +49,27 @@ function Get-EnvironmentConfiguration {
 
 # Reads the accounts file into Path, Default (an account name or $null) and Accounts (name -> settings,
 # both looked up ignoring case). Returns $null when there is no file; throws when it is not valid.
+# ConvertFrom-Json keeps the case of the keys, and keeps apart keys that differ only in case. The rest
+# of the module ignores case (as do the Credential Manager and the SMTP_PASS_<ACCOUNT> variables), so
+# the keys, account names and settings of the file are read ignoring case too, and two that differ only
+# in case are an error rather than one of them lost.
 function Read-AccountFile {
     $path = Get-AccountFilePath
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
 
     try {
-        $data = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json -AsHashtable
+        $json = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json -AsHashtable
     } catch {
         throw "The accounts file '$path' is not valid JSON: $($_.Exception.Message)"
     }
-    if ($null -eq $data) { $data = @{} }
-    if ($data -isnot [System.Collections.IDictionary]) { throw "The accounts file '$path' must hold a JSON object." }
-    foreach ($key in $data.psbase.Keys) {
-        if ($key -notin 'Default', 'Accounts') { throw "Unknown key '$key' in the accounts file '$path'." }
+    if ($null -eq $json) { $json = @{} }
+    if ($json -isnot [System.Collections.IDictionary]) { throw "The accounts file '$path' must hold a JSON object." }
+    $data = @{}
+    foreach ($entry in $json.GetEnumerator()) {
+        $key = 'Default', 'Accounts' | Where-Object { $_ -eq $entry.Key }
+        if (-not $key) { throw "Unknown key '$($entry.Key)' in the accounts file '$path'." }
+        if ($data.ContainsKey($key)) { throw "The key '$key' is twice in the accounts file '$path', in different case." }
+        $data[$key] = $entry.Value
     }
 
     $accounts = [ordered]@{}
@@ -72,6 +80,8 @@ function Read-AccountFile {
             if ($name -notmatch $script:AccountNamePattern) {
                 throw "Invalid account name '$name' in '$path': use letters, digits, '.', '-' and '_', starting with a letter or digit."
             }
+            $sameName = @($accounts.psbase.Keys | Where-Object { $_ -eq $name })
+            if ($sameName) { throw "The accounts '$($sameName[0])' and '$name' in '$path' differ only in case, which makes them the same account: rename or remove one." }
             if ($entry.Value -isnot [System.Collections.IDictionary]) { throw "Account '$name' in '$path' must be a JSON object." }
 
             $settings = [ordered]@{}
@@ -80,6 +90,7 @@ function Read-AccountFile {
                 if (-not $key) {
                     throw "Unknown setting '$($setting.Key)' in account '$name' of '$path'. Settings: $($script:AccountSettingNames -join ', ')."
                 }
+                if ($settings.Contains($key)) { throw "The setting '$key' is twice in account '$name' of '$path', in different case." }
                 $value = $setting.Value
                 if ($key -eq 'Port') {
                     if (($value -isnot [int] -and $value -isnot [long]) -or $value -lt 1 -or $value -gt 65535) { throw "Port of account '$name' in '$path' must be a number from 1 to 65535." }
