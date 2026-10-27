@@ -63,7 +63,7 @@ Send-Mail -Account work -Subject "Maintenance tonight" -Body "..." -To "client@e
 Send-Mail -Subject "Backup finished" -Body "..."   # the default account, "automation"
 ```
 
-`Set-MailAccount` changes only the settings given (an empty value removes one), `Get-MailAccount` lists the accounts and where each password comes from, and `Remove-MailAccount` removes an account and its stored password.
+`Set-MailAccount` changes only the settings given (an empty value removes one), `Get-MailAccount` lists the accounts and where each password comes from, and `Remove-MailAccount` removes accounts and their stored passwords. Both take wildcards, and `Get-MailAccount test* | Remove-MailAccount -WhatIf` shows what would be removed.
 
 | Setting | Required | Default | Description |
 |---------|----------|---------|-------------|
@@ -118,6 +118,8 @@ foreach ($name in 'SMTP_SERVER', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FR
 ```
 
 On Linux and macOS, remove them from wherever they are set (shell profile, PowerShell profile, systemd unit).
+
+To go back to the variables, take the default away from the account (`Set-MailAccount automation -Default:$false`), or remove every account and its stored password with `Remove-MailAccount *`. Set the `SMTP_*` variables again if they were removed.
 
 > [!WARNING]
 > **Scheduled tasks and services:** check how they run before moving them to an account. Accounts and their passwords belong to the user who created them, so a task or service that runs as another user (SYSTEM, a service account, root) doesn't see them. On Windows, a scheduled task set to run whether the user is logged on or not with *Do not store password* (logon type S4U) runs as you but can't read the Credential Manager, which needs your logon password to decrypt. Senders like these should stay on the `SMTP_*` variables: don't make an account the default, and leave the variables where the task reads them (often at machine level).

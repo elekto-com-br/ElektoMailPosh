@@ -12,7 +12,7 @@
 RootModule = 'ElektoMailPosh.psm1'
 
 # Version number of this module.
-ModuleVersion = '2.0.0'
+ModuleVersion = '2.0.1'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Core')
@@ -110,6 +110,11 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
+## 2.0.1
+- Remove-MailAccount takes several names, wildcards and the accounts piped from Get-MailAccount; Remove-MailAccount * removes every account and its stored password, so Send-Mail goes back to the SMTP_* environment variables
+- The README says that upgrading from 1.x needs only the update, and warns that a Windows scheduled task set to "Do not store password" (S4U) cannot read the Credential Manager
+- Copyright 2024-2026
+
 ## 2.0.0
 - Requires PowerShell 7.4 or later; Windows PowerShell 5.1 is no longer supported
 - Accounts, like those of msmtp: Set-MailAccount, Get-MailAccount and Remove-MailAccount keep named sets of SMTP settings (server, port, user, sender, default recipients), and Send-Mail -Account sends from one of them, or from the default account
