@@ -308,6 +308,8 @@ notify:
 | `-Priority` | String | No | `Normal` | `Low`, `Normal` or `High` |
 | `-Attachments` | String[] | No | `@()` | Array of file paths to attach |
 
+As in 1.x, the parameters `-Subject`, `-Body`, `-IsHtml`, `-FromName`, `-To`, `-Cc`, `-Bcc`, `-Priority` and `-Attachments` may also be given by position, in this order: `Send-Mail $subject $body $true` is `Send-Mail -Subject $subject -Body $body -IsHtml $true`. The others take names only.
+
 ## Troubleshooting
 
 Use `-Verbose` for progress information and `-Debug` for detailed diagnostics:

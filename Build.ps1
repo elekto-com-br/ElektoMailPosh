@@ -4,9 +4,10 @@ Validates the module and stages the files that go to the PowerShell Gallery.
 
 .DESCRIPTION
 The PowerShell equivalent of "does it compile": every script is parsed for syntax errors,
-the manifest is validated, PSScriptAnalyzer runs (when installed) and the module is imported
-in a clean process to check that the public commands are exported. If everything passes, the package
-files are copied to ./out/ElektoMailPosh, ready for Publish-PSResource.
+the manifest is validated, PSScriptAnalyzer runs (when installed), the module is imported
+in a clean process to check that the public commands are exported, and the tests in ./Tests run with
+Pester 5 or later (when installed). If everything passes, the package files are copied to
+./out/ElektoMailPosh, ready for Publish-PSResource.
 
 Used by .github/workflows/publish.yml; can also be run locally before tagging.
 
@@ -66,7 +67,18 @@ pwsh -NoProfile -NonInteractive -Command $importCheck
 if ($LASTEXITCODE -ne 0) { throw "Module import check failed." }
 Write-Host "Import OK."
 
-# 5. Stage the package
+# 5. Tests, in a clean process too (Windows PowerShell ships a Pester 3, which can't run them)
+if (Get-Module -ListAvailable Pester | Where-Object Version -ge '5.0') {
+    $testRun = "Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop; " +
+        "if ((Invoke-Pester -Path '$(Join-Path $PSScriptRoot 'Tests')' -Output Detailed -PassThru).Result -ne 'Passed') { exit 1 }"
+    pwsh -NoProfile -NonInteractive -Command $testRun
+    if ($LASTEXITCODE -ne 0) { throw "Tests failed." }
+    Write-Host "Tests OK."
+} else {
+    Write-Warning "Pester 5 or later not installed; skipping tests."
+}
+
+# 6. Stage the package
 $outDir = Join-Path (Join-Path $PSScriptRoot 'out') $moduleName
 if (Test-Path $outDir) { Remove-Item -Path $outDir -Recurse -Force }
 New-Item -ItemType Directory -Path $outDir | Out-Null

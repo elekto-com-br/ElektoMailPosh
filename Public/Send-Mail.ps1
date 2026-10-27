@@ -118,13 +118,16 @@ Send-Mail -Subject "Re: Backup failed on host" -Body "Fixed." -InReplyTo "<backu
 Sends an alert and, later, a follow-up that mail clients show in the same conversation.
 #>
 Function Send-Mail {
+    # The positions are those of 1.x, where PowerShell numbered the parameters in the order they were
+    # declared, and scripts call it that way ("Send-Mail $subject $body $true"). Parameter sets turn the
+    # numbering off, so it is explicit here; the parameters added since 2.0 take names only.
     [CmdletBinding(DefaultParameterSetName = 'Body')]
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory=$true, Position=0)]
         [ValidateNotNullOrEmpty()]
         [string]$Subject,
 
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true, ParameterSetName='Body')]
+        [Parameter(Mandatory=$true, Position=1, ValueFromPipeline=$true, ParameterSetName='Body')]
         [AllowEmptyString()]
         [string]$Body,
 
@@ -132,20 +135,33 @@ Function Send-Mail {
         [ValidateNotNullOrEmpty()]
         [string]$BodyFile,
 
+        [Parameter(Position=2)]
         [bool]$IsHtml = $False,
+
         [string]$Account = $null,
+
+        [Parameter(Position=3)]
         [string]$FromName = $null,
+
+        [Parameter(Position=4)]
         [string[]]$To = @(),
+
+        [Parameter(Position=5)]
         [string[]]$Cc = @(),
+
+        [Parameter(Position=6)]
         [string[]]$Bcc = @(),
+
         [string[]]$ReplyTo = @(),
         [string]$MessageId = $null,
         [string]$InReplyTo = $null,
         [string[]]$References = @(),
 
+        [Parameter(Position=7)]
         [ValidateSet('Low', 'Normal', 'High')]
         [string]$Priority = 'Normal',
 
+        [Parameter(Position=8)]
         [string[]]$Attachments = @()
     )
 
