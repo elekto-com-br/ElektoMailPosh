@@ -188,8 +188,18 @@ if (Get-Module -ListAvailable Pester | Where-Object Version -ge '5.0') {
     $changed = @($before | Where-Object { $_ -notin $after } | ForEach-Object { "before: $_" }) + @($after | Where-Object { $_ -notin $before } | ForEach-Object { "after:  $_" })
     $strays = @('config', ".config/$moduleName", "Library/Application Support/$moduleName" | ForEach-Object { Join-Path $testHome $_ } | Where-Object { Test-Path -LiteralPath $_ })
     Remove-Item -LiteralPath $testHome -Recurse -Force -ErrorAction Ignore
-    if ($changed) { throw "The tests changed the accounts of this machine ($($realFolders -join ', ')$(if ($IsWindows) { ", credentials ${moduleName}:*" })):`n$($changed -join "`n")" }
-    if ($strays) { throw "A test kept accounts outside its test drive: $($strays -join ', ')." }
+    # Each change on a line of its own, written before the error: in the message of an error, the view of errors folds
+    # the lines into one when the output goes to a file (found on Windows)
+    if ($changed) {
+        Write-Host "The tests changed the accounts of this machine ($($realFolders -join ', ')$(if ($IsWindows) { ", credentials ${moduleName}:*" })):"
+        $changed | ForEach-Object { Write-Host "  $_" }
+        throw "The tests changed the accounts of this machine: $($changed.Count) change(s), listed above."
+    }
+    if ($strays) {
+        Write-Host 'A test kept accounts outside its test drive:'
+        $strays | ForEach-Object { Write-Host "  $_" }
+        throw "A test kept accounts outside its test drive: $($strays.Count) folder(s), listed above."
+    }
     if ($testsFailed) { throw "Tests failed." }
     Write-Host "Tests OK, and the accounts of this machine untouched."
 } else {
