@@ -29,14 +29,86 @@ $moduleName = 'ElektoMailPosh'
 $manifestPath = Join-Path $PSScriptRoot "$moduleName.psd1"
 $packageFiles = @("$moduleName.psd1", "$moduleName.psm1", 'Private', 'Public', 'LICENSE', 'README.md')
 
-# The files of some folders, each as its path, size and time of last write: enough to see that one changed, without
-# reading what it holds, password files among them
-function Get-FolderState([string[]]$Folders) {
+# What the accounts of this machine are, as text, enough to see that one changed without reading what it holds: the
+# files of their folders, each as its path, size and time of last write, password files among them; and on Windows,
+# where the passwords go to the Credential Manager whatever the folder, the credentials of the module, each as its name
+# and time of last write. These come from CredEnumerate, as cmdkey writes its list in the language of the system; the
+# password of a credential is never read. As ElektoImapPosh does since its #25.
+function Get-AccountState([string[]]$Folders) {
     foreach ($folder in $Folders | Select-Object -Unique) {
         if (Test-Path -LiteralPath $folder) {
             Get-ChildItem -LiteralPath $folder -Recurse -Force -File | ForEach-Object { '{0} {1} {2}' -f $_.FullName, $_.Length, $_.LastWriteTimeUtc.Ticks }
         }
     }
+    if (-not $IsWindows) { return }
+    if (-not ('ElektoMailPoshBuild.Credentials' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+
+namespace ElektoMailPoshBuild
+{
+    public static class Credentials
+    {
+        private const int ERROR_NOT_FOUND = 1168;
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct CREDENTIAL
+        {
+            public int Flags;
+            public int Type;
+            public string TargetName;
+            public string Comment;
+            public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;
+            public int CredentialBlobSize;
+            public IntPtr CredentialBlob;
+            public int Persist;
+            public int AttributeCount;
+            public IntPtr Attributes;
+            public string TargetAlias;
+            public string UserName;
+        }
+
+        [DllImport("advapi32.dll", EntryPoint = "CredEnumerateW", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool CredEnumerate(string filter, int flags, out int count, out IntPtr credentials);
+
+        [DllImport("advapi32.dll", EntryPoint = "CredFree")]
+        private static extern void CredFree(IntPtr buffer);
+
+        // The credentials whose names match the filter, each as its name and the time it was last written
+        public static string[] List(string filter)
+        {
+            int count;
+            IntPtr list;
+            if (!CredEnumerate(filter, 0, out count, out list))
+            {
+                int error = Marshal.GetLastWin32Error();
+                if (error == ERROR_NOT_FOUND) { return new string[0]; }
+                throw new Win32Exception(error);
+            }
+            try
+            {
+                var names = new List<string>();
+                for (int i = 0; i < count; i++)
+                {
+                    var credential = Marshal.PtrToStructure<CREDENTIAL>(Marshal.ReadIntPtr(list, i * IntPtr.Size));
+                    long written = ((long)(uint)credential.LastWritten.dwHighDateTime << 32) | (uint)credential.LastWritten.dwLowDateTime;
+                    names.Add(credential.TargetName + " " + written);
+                }
+                return names.ToArray();
+            }
+            finally
+            {
+                CredFree(list);
+            }
+        }
+    }
+}
+'@
+    }
+    [ElektoMailPoshBuild.Credentials]::List("${moduleName}:*")
 }
 
 # 1. Syntax: parse every PowerShell file
@@ -81,13 +153,13 @@ Write-Host "Import OK."
 # may have real accounts, which no test may touch. Each test file keeps its accounts in its test drive and reaches no
 # real password store (Tests/TestIsolation.ps1); besides, the tests run with SMTP_CONFIG_DIR and, on Linux and macOS,
 # HOME in a temporary folder, so that the default folder of accounts is not the real one either. The build fails if the
-# folders of the real accounts changed, compared by their files' names, sizes and times (never by what they hold), or
-# if a test left accounts in the temporary folder.
+# real accounts changed (Get-AccountState: the files of their folders, and on Windows the credentials of the module,
+# compared by name, size and time, never by what they hold), or if a test left accounts in the temporary folder.
 if (Get-Module -ListAvailable Pester | Where-Object Version -ge '5.0') {
     # The folders in which the module keeps the accounts of this machine, as it finds them
     $realFolders = @(pwsh -NoProfile -NonInteractive -Command "Import-Module '$manifestPath' -ErrorAction Stop; & (Get-Module $moduleName) { Get-AccountDirectory; Get-ApplicationDataDirectory }" | Select-Object -Unique)
     if ($LASTEXITCODE -ne 0 -or $realFolders.Count -eq 0) { throw 'Could not find the folders of the accounts of this machine.' }
-    $before = @(Get-FolderState $realFolders)
+    $before = @(Get-AccountState $realFolders)
 
     $testHome = Join-Path ([IO.Path]::GetTempPath()) "$moduleName-tests-$([guid]::NewGuid().ToString('N'))"
     New-Item -ItemType Directory -Path $testHome | Out-Null
@@ -112,12 +184,22 @@ if (Get-Module -ListAvailable Pester | Where-Object Version -ge '5.0') {
         }
     }
 
-    $after = @(Get-FolderState $realFolders)
+    $after = @(Get-AccountState $realFolders)
     $changed = @($before | Where-Object { $_ -notin $after } | ForEach-Object { "before: $_" }) + @($after | Where-Object { $_ -notin $before } | ForEach-Object { "after:  $_" })
     $strays = @('config', ".config/$moduleName", "Library/Application Support/$moduleName" | ForEach-Object { Join-Path $testHome $_ } | Where-Object { Test-Path -LiteralPath $_ })
     Remove-Item -LiteralPath $testHome -Recurse -Force -ErrorAction Ignore
-    if ($changed) { throw "The tests changed the accounts of this machine ($($realFolders -join ', ')):`n$($changed -join "`n")" }
-    if ($strays) { throw "A test kept accounts outside its test drive: $($strays -join ', ')." }
+    # Each change on a line of its own, written before the error: in the message of an error, the view of errors folds
+    # the lines into one when the output goes to a file (found on Windows)
+    if ($changed) {
+        Write-Host "The tests changed the accounts of this machine ($($realFolders -join ', ')$(if ($IsWindows) { ", credentials ${moduleName}:*" })):"
+        $changed | ForEach-Object { Write-Host "  $_" }
+        throw "The tests changed the accounts of this machine: $($changed.Count) change(s), listed above."
+    }
+    if ($strays) {
+        Write-Host 'A test kept accounts outside its test drive:'
+        $strays | ForEach-Object { Write-Host "  $_" }
+        throw "A test kept accounts outside its test drive: $($strays.Count) folder(s), listed above."
+    }
     if ($testsFailed) { throw "Tests failed." }
     Write-Host "Tests OK, and the accounts of this machine untouched."
 } else {
