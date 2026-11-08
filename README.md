@@ -74,7 +74,7 @@ Send-Mail -Subject "Backup finished" -Body "..."   # the default account, "autom
 | `FromName` | No | Machine name | Sender display name |
 | `To`, `Cc`, `Bcc`, `ReplyTo` | No | - | Default addresses, when `Send-Mail` gets none |
 
-The settings are kept in `accounts.json`, in the folder `ElektoMailPosh` of your configuration folder (`%APPDATA%` on Windows, `~/.config` on Linux and macOS), or in the folder named by `SMTP_CONFIG_DIR`. It holds no passwords, so it can be read and edited by hand:
+The settings are kept in `accounts.json`, in the folder `ElektoMailPosh` of your configuration folder (`%APPDATA%` on Windows; `$XDG_CONFIG_HOME`, or else `~/.config`, on Linux and macOS), or in the folder named by `SMTP_CONFIG_DIR`. It holds no passwords, so it can be read and edited by hand:
 
 ```json
 {
@@ -88,6 +88,14 @@ The settings are kept in `accounts.json`, in the folder `ElektoMailPosh` of your
 
 The file is read ignoring case, as PowerShell reads names: keys and settings can be written in any case, and `Send-Mail -Account WORK` sends from the account `work`. So two accounts whose names differ only in case are refused, since they would be the same account and share its password.
 
+The file is written beside itself and then put in its place, so a write that fails leaves the previous file whole. It keeps its mode on Linux and macOS, and when it is a link (into a dotfiles repository, say), the change goes to the file it points to and the link stays.
+
+On macOS, versions 2.0.0 to 2.0.3 kept the folder in `~/Library/Application Support/ElektoMailPosh` (where .NET 8 puts the configuration of applications) rather than in `~/.config`. That folder is still used while `~/.config/ElektoMailPosh` has no `accounts.json`; to move it, with its passwords:
+
+```bash
+mkdir -p ~/.config && mv ~/Library/Application\ Support/ElektoMailPosh ~/.config/
+```
+
 #### Where the passwords go
 
 | Platform | Store | Protection |
@@ -95,7 +103,7 @@ The file is read ignoring case, as PowerShell reads names: keys and settings can
 | Windows | Credential Manager, generic credential `ElektoMailPosh:<account>` | Encrypted with your logon (DPAPI), like any password Windows remembers |
 | Linux, macOS | File `secrets/<account>` next to `accounts.json` | Readable only by you (mode 600, folder 700), as with msmtp, ssh or `.pgpass`; a file others can read is refused |
 
-On any platform, the environment variable `SMTP_PASS_<ACCOUNT>` (the account name in upper case, other characters than letters and digits as `_`, e.g. `SMTP_PASS_WORK`) takes precedence over the stored password, for pipelines and services that get their secrets from the environment.
+On any platform, the environment variable `SMTP_PASS_<ACCOUNT>` (the account name in upper case, other characters than letters and digits as `_`, e.g. `SMTP_PASS_WORK`) takes precedence over the stored password, for pipelines and services that get their secrets from the environment. So two accounts whose names give the same variable, such as `work.prod` and `work-prod` (both `SMTP_PASS_WORK_PROD`), are refused: one would send the password of the other to its own server.
 
 On Windows the credential can also be stored or seen with the system tools: `cmdkey /generic:ElektoMailPosh:work /user:me@example.com /pass` asks for the password, and the credentials appear in Control Panel > Credential Manager > Windows Credentials.
 

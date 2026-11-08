@@ -178,8 +178,8 @@ Function Send-Mail {
 
         # A Message-ID in angle brackets (added when missing), or $null when the value is not one
         function ConvertTo-MessageId([string]$Value) {
-            $id = $Value.Trim() -replace '^<(.*)>$', '$1'
-            if ($id -notmatch '^[^\s<>@]+@[^\s<>@]+$') { return $null }
+            $id = $Value.Trim() -creplace '^<(.*)>$', '$1'
+            if ($id -cnotmatch '^[^\s<>@]+@[^\s<>@]+$') { return $null }
             return "<$id>"
         }
     }
@@ -195,7 +195,7 @@ Function Send-Mail {
                 return
             }
             $Body = Get-Content -LiteralPath $BodyFile -Raw -Encoding utf8
-            if (-not $PSBoundParameters.ContainsKey('IsHtml') -and $BodyFile -match '\.html?$') { $IsHtml = $true }
+            if (-not $PSBoundParameters.ContainsKey('IsHtml') -and [IO.Path]::GetExtension($BodyFile) -in '.html', '.htm') { $IsHtml = $true }
         } else {
             $Body = $bodyLines -join [Environment]::NewLine
         }
@@ -238,7 +238,7 @@ Function Send-Mail {
 
         # Message-ID, and In-Reply-To with References, which put this email in the conversation it answers.
         # References may come as the header of the email answered: IDs separated by spaces.
-        $referenceValues = @($References -split '[\s,]+' | Where-Object { $_ })
+        $referenceValues = @($References -csplit '[\s,]+' | Where-Object { $_ })
         foreach ($value in @($MessageId, $InReplyTo | Where-Object { $_ }) + $referenceValues) {
             if (-not (ConvertTo-MessageId $value)) {
                 Write-Error "Not a Message-ID: '$value'. Expected <id@domain>."

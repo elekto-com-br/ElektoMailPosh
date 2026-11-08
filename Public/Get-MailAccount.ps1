@@ -39,7 +39,7 @@ Function Get-MailAccount {
         Write-Verbose "There is no accounts file at '$(Get-AccountFilePath)'."
     }
 
-    $names = @(if ($file) { $file.Accounts.psbase.Keys | Where-Object { $_ -like $Name } })
+    $names = @(if ($file) { $file.Accounts.psbase.Keys | Where-Object { Test-Wildcard $_ $Name } })
     if ($names.Count -eq 0 -and -not [WildcardPattern]::ContainsWildcardCharacters($Name)) {
         Write-Error "There is no account '$Name'."
         return

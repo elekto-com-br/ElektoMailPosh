@@ -38,7 +38,7 @@ Function Remove-MailAccount {
         foreach ($pattern in $Name) {
             $file = Read-AccountFile
             # Account names hold no wildcard characters, so a plain name matches only itself
-            $names = @(if ($file) { $file.Accounts.psbase.Keys | Where-Object { $_ -like $pattern } })
+            $names = @(if ($file) { $file.Accounts.psbase.Keys | Where-Object { Test-Wildcard $_ $pattern } })
             if ($names.Count -eq 0 -and -not [WildcardPattern]::ContainsWildcardCharacters($pattern)) {
                 Write-Error "There is no account '$pattern'."
                 continue
@@ -48,13 +48,15 @@ Function Remove-MailAccount {
             foreach ($existingName in $names) {
                 if (-not $PSCmdlet.ShouldProcess("account '$existingName' in '$($file.Path)' and its stored password", 'Remove')) { continue }
 
-                # The file first: if it cannot be written, the password stays
+                # The password first: if it cannot be deleted, the account stays as it was; if the file then cannot
+                # be written, the account stays without a password, as Get-MailAccount shows, and removing it again
+                # finishes the job. The other way round, a password would stay with no account to show it.
+                if (Clear-StoredPassword $existingName) { Write-Verbose "Stored password of account '$existingName' deleted." }
+
                 $file.Accounts.Remove($existingName)
                 if ($defaultName -eq $existingName) { $defaultName = $null }
                 Write-AccountFile $defaultName $file.Accounts
                 Write-Verbose "Account '$existingName' removed from '$($file.Path)'."
-
-                if (Clear-StoredPassword $existingName) { Write-Verbose "Stored password of account '$existingName' deleted." }
 
                 $variable = Get-PasswordVariableName $existingName
                 if ([Environment]::GetEnvironmentVariable($variable)) {
