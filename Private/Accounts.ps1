@@ -172,8 +172,9 @@ function Find-PasswordVariableOwner($Names, [string]$Name) {
 }
 
 # Writes the accounts file, settings in a fixed order and without the empty ones. Any failure stops the caller here,
-# before it stores or deletes a password that would then not match: an exception of .NET, as the rename below may
-# throw, would otherwise end only its own statement, and the command went on as if the file were written (measured).
+# before it stores or deletes a password that would then not match: an exception of .NET would otherwise end only its
+# own statement, and the command went on as if the file were written (measured with the rename, which also says now
+# what failed). $ErrorActionPreference covers the other calls of .NET here, and any added later.
 function Write-AccountFile([string]$Default, [System.Collections.IDictionary]$Accounts) {
     $ErrorActionPreference = 'Stop'
     $path = Get-AccountFilePath
@@ -218,7 +219,15 @@ function Write-AccountFile([string]$Default, [System.Collections.IDictionary]$Ac
             [IO.File]::SetUnixFileMode($temporary, $mode)
         }
         Set-Content -LiteralPath $temporary -Value ($data | ConvertTo-Json -Depth 5) -Encoding utf8NoBOM -ErrorAction Stop
-        [IO.File]::Move($temporary, $path, $true)
+        # On Windows a file that another program holds open cannot be replaced, and .NET then says only "Access to the
+        # path is denied" (measured in a Windows Sandbox), which reads as a matter of permissions
+        try {
+            [IO.File]::Move($temporary, $path, $true)
+        } catch {
+            $reason = if ($_.Exception.InnerException) { $_.Exception.InnerException.Message } else { $_.Exception.Message }
+            $hint = if ($IsWindows) { ' Another program, such as an editor or a sync client, may have it open.' } else { '' }
+            throw "Could not replace the accounts file '$path': $reason$hint"
+        }
     } finally {
         if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force -ErrorAction Ignore }
     }

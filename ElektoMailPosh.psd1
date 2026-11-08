@@ -117,6 +117,9 @@ PrivateData = @{
 - Two accounts whose names give the same password variable, such as work.prod and work-prod (both SMTP_PASS_WORK_PROD), are refused, in the file and by Set-MailAccount for a new account: with the variable set, one sent the password of the other to its own server
 - Remove-MailAccount deletes the password before it removes the account from the file, and a password that cannot be deleted stops it. Before, the account was removed and its password left behind, with no account to show it, and reported as deleted
 - A failure of the password store, or of putting the accounts file in its place, stops Set-MailAccount and Remove-MailAccount: an error of .NET (of the Windows Credential Manager, say) ended only its own statement, and the command went on as if it had worked
+- When accounts.json cannot be replaced, the error says so, and on Windows that another program may have the file open: .NET says only "Access to the path is denied"
+- Set-MailAccount says why a stored password cannot be used (a file it cannot read, or one that others can read), rather than that the account has none
+- The README's command that removes the SMTP_* variables on Windows deletes them on PowerShell 7.5 and later too, where it left them in place, empty, and removes SMTP_REPLY_TO as well
 - Account names are checked alike in every culture, and take only the letters A to Z: a name with a dotless i was taken in a session in Turkish, and one with a dotted capital I in any session, and the accounts file was then refused in sessions in other cultures. A file that holds such a name is now refused everywhere: rename that account
 - In a session in Turkish, Get-MailAccount, Remove-MailAccount and the completion of account names find an account whatever the case of the i in its name: "Remove-MailAccount work-inbox" missed the account WORK-INBOX
 

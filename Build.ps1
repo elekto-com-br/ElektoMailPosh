@@ -29,6 +29,16 @@ $moduleName = 'ElektoMailPosh'
 $manifestPath = Join-Path $PSScriptRoot "$moduleName.psd1"
 $packageFiles = @("$moduleName.psd1", "$moduleName.psm1", 'Private', 'Public', 'LICENSE', 'README.md')
 
+# The files of some folders, each as its path, size and time of last write: enough to see that one changed, without
+# reading what it holds, password files among them
+function Get-FolderState([string[]]$Folders) {
+    foreach ($folder in $Folders | Select-Object -Unique) {
+        if (Test-Path -LiteralPath $folder) {
+            Get-ChildItem -LiteralPath $folder -Recurse -Force -File | ForEach-Object { '{0} {1} {2}' -f $_.FullName, $_.Length, $_.LastWriteTimeUtc.Ticks }
+        }
+    }
+}
+
 # 1. Syntax: parse every PowerShell file
 $scripts = Get-ChildItem -Path $PSScriptRoot -Recurse -Include '*.ps1', '*.psm1', '*.psd1' |
     Where-Object { $_.FullName -notmatch '[\\/](out|\.git)[\\/]' }
@@ -67,13 +77,49 @@ pwsh -NoProfile -NonInteractive -Command $importCheck
 if ($LASTEXITCODE -ne 0) { throw "Module import check failed." }
 Write-Host "Import OK."
 
-# 5. Tests, in a clean process too (Windows PowerShell ships a Pester 3, which can't run them)
+# 5. Tests, in a clean process too (Windows PowerShell ships a Pester 3, which can't run them). Whoever runs the build
+# may have real accounts, which no test may touch. Each test file keeps its accounts in its test drive and reaches no
+# real password store (Tests/TestIsolation.ps1); besides, the tests run with SMTP_CONFIG_DIR and, on Linux and macOS,
+# HOME in a temporary folder, so that the default folder of accounts is not the real one either. The build fails if the
+# folders of the real accounts changed, compared by their files' names, sizes and times (never by what they hold), or
+# if a test left accounts in the temporary folder.
 if (Get-Module -ListAvailable Pester | Where-Object Version -ge '5.0') {
-    $testRun = "Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop; " +
-        "if ((Invoke-Pester -Path '$(Join-Path $PSScriptRoot 'Tests')' -Output Detailed -PassThru).Result -ne 'Passed') { exit 1 }"
-    pwsh -NoProfile -NonInteractive -Command $testRun
-    if ($LASTEXITCODE -ne 0) { throw "Tests failed." }
-    Write-Host "Tests OK."
+    # The folders in which the module keeps the accounts of this machine, as it finds them
+    $realFolders = @(pwsh -NoProfile -NonInteractive -Command "Import-Module '$manifestPath' -ErrorAction Stop; & (Get-Module $moduleName) { Get-AccountDirectory; Get-ApplicationDataDirectory }" | Select-Object -Unique)
+    if ($LASTEXITCODE -ne 0 -or $realFolders.Count -eq 0) { throw 'Could not find the folders of the accounts of this machine.' }
+    $before = @(Get-FolderState $realFolders)
+
+    $testHome = Join-Path ([IO.Path]::GetTempPath()) "$moduleName-tests-$([guid]::NewGuid().ToString('N'))"
+    New-Item -ItemType Directory -Path $testHome | Out-Null
+    $savedEnvironment = @{}
+    foreach ($name in 'HOME', 'XDG_CONFIG_HOME', 'SMTP_CONFIG_DIR') { $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name) }
+    try {
+        if (-not $IsWindows) {
+            $env:HOME = $testHome
+            $env:XDG_CONFIG_HOME = $null
+        }
+        $env:SMTP_CONFIG_DIR = Join-Path $testHome 'config'
+        $testRun = "Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop; " +
+            "if ((Invoke-Pester -Path '$(Join-Path $PSScriptRoot 'Tests')' -Output Detailed -PassThru).Result -ne 'Passed') { exit 1 }"
+        pwsh -NoProfile -NonInteractive -Command $testRun
+        $testsFailed = $LASTEXITCODE -ne 0
+    } finally {
+        # Through the provider: [Environment]::SetEnvironmentVariable($name, $null) leaves the variable, empty, since
+        # .NET 9 (PowerShell 7.5), and a build run in a session would leave it so there
+        foreach ($entry in $savedEnvironment.GetEnumerator()) {
+            if ($null -eq $entry.Value) { Remove-Item -Path "env:$($entry.Key)" -ErrorAction Ignore }
+            else { Set-Item -Path "env:$($entry.Key)" -Value $entry.Value }
+        }
+    }
+
+    $after = @(Get-FolderState $realFolders)
+    $changed = @($before | Where-Object { $_ -notin $after } | ForEach-Object { "before: $_" }) + @($after | Where-Object { $_ -notin $before } | ForEach-Object { "after:  $_" })
+    $strays = @('config', ".config/$moduleName", "Library/Application Support/$moduleName" | ForEach-Object { Join-Path $testHome $_ } | Where-Object { Test-Path -LiteralPath $_ })
+    Remove-Item -LiteralPath $testHome -Recurse -Force -ErrorAction Ignore
+    if ($changed) { throw "The tests changed the accounts of this machine ($($realFolders -join ', ')):`n$($changed -join "`n")" }
+    if ($strays) { throw "A test kept accounts outside its test drive: $($strays -join ', ')." }
+    if ($testsFailed) { throw "Tests failed." }
+    Write-Host "Tests OK, and the accounts of this machine untouched."
 } else {
     Write-Warning "Pester 5 or later not installed; skipping tests."
 }

@@ -1,16 +1,16 @@
 # Send-Mail as the scripts written for 1.x call it: parameters by position, body from the pipeline.
 # The SMTP client is replaced by one that keeps what it would send, so nothing leaves the machine.
 
-BeforeAll {
-    Import-Module (Join-Path (Split-Path $PSScriptRoot) 'ElektoMailPosh.psd1') -Force
+# PSScriptAnalyzer does not see that Pester gives AfterAll and the tests the variables of BeforeAll
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification = 'Variables of BeforeAll are used by AfterAll and the tests')]
+param ()
 
-    # Only the SMTP_* variables, and an empty configuration folder: a machine without accounts
-    $savedEnvironment = @{}
-    foreach ($name in 'SMTP_CONFIG_DIR', 'SMTP_SERVER', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM', 'SMTP_FROM_NAME', 'SMTP_TO', 'SMTP_CC', 'SMTP_BCC', 'SMTP_REPLY_TO') {
-        $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name)
-        [Environment]::SetEnvironmentVariable($name, $null)
-    }
-    $env:SMTP_CONFIG_DIR = Join-Path $TestDrive 'config'
+BeforeAll {
+    . (Join-Path $PSScriptRoot 'TestIsolation.ps1')
+    Import-Module (Join-Path (Split-Path $PSScriptRoot) 'ElektoMailPosh.psd1') -Force
+    $isolation = Enter-TestIsolation
+
+    # Only these SMTP_* variables, and an empty configuration folder: a machine without accounts
     $env:SMTP_USER = 'robot@example.com'
     $env:SMTP_PASS = 'not-a-password'
     $env:SMTP_TO = 'ops@example.com'
@@ -47,9 +47,7 @@ BeforeAll {
 }
 
 AfterAll {
-    foreach ($entry in $savedEnvironment.GetEnumerator()) {
-        [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value)
-    }
+    Exit-TestIsolation $isolation
     Remove-Module ElektoMailPosh -ErrorAction SilentlyContinue
 }
 
