@@ -12,7 +12,7 @@
 RootModule = 'ElektoMailPosh.psm1'
 
 # Version number of this module.
-ModuleVersion = '2.0.3'
+ModuleVersion = '2.0.4'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Core')
@@ -110,6 +110,10 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
+## 2.0.4
+- Account names are checked alike in every culture, and take only the letters A to Z: a name with a dotless i was taken in a session in Turkish, and one with a dotted capital I in any session, and the accounts file was then refused in sessions in other cultures. A file that holds such a name is now refused everywhere: rename that account
+- In a session in Turkish, Get-MailAccount, Remove-MailAccount and the completion of account names find an account whatever the case of the i in its name: "Remove-MailAccount work-inbox" missed the account WORK-INBOX
+
 ## 2.0.3
 - accounts.json is read ignoring case, as account names already were: "default" and "accounts" written in lower case were taken for an empty file, and Send-Mail went back to the SMTP_* environment variables without a word
 - Two accounts whose names differ only in case, or a key or setting written twice in different case, are an error; before, one of them was dropped without a word

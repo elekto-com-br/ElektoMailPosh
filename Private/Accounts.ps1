@@ -4,12 +4,29 @@
 
 $script:AccountSettingNames = @('Server', 'Port', 'User', 'From', 'FromName', 'To', 'Cc', 'Bcc', 'ReplyTo')
 $script:AddressSettingNames = @('To', 'Cc', 'Bcc', 'ReplyTo')
+# Matched telling case apart (-cnotmatch, and Options None in the ValidatePattern of Set-MailAccount), as it names
+# both: ignoring case as the culture does, it took a dotless i in a session in Turkish and a dotted capital I in any
+# session, and the file such a name went to was then refused in sessions in other cultures (measured)
 $script:AccountNamePattern = '^[A-Za-z0-9][A-Za-z0-9_.-]*$'
 $script:DefaultServer = 'smtp.gmail.com'
 $script:DefaultPort = 587
 
 # Account names are keys of dictionaries, where PowerShell gives a key precedence over a property of the
 # same name: an account called "Keys" would hide .Keys. So the names are always listed with .psbase.Keys.
+
+# Whether an account name matches a wildcard pattern, ignoring case alike in every culture. -like ignores case as
+# the culture of the session does, and in Turkish "I" is not the capital of "i": "work-inbox" missed the account
+# "WORK-INBOX" (measured). Elsewhere the module compares text only in the forms that tell case apart (-cmatch,
+# -creplace, -csplit) or with -eq and -in, which no culture changes; Tests/Culture.Tests.ps1 reads the code and fails
+# on any other. A pattern that is not valid ("work[") throws with the message of PowerShell, as -like did, rather than
+# with the 'Exception calling "IsMatch"' that wraps it.
+function Test-Wildcard([string]$Text, [string]$Pattern) {
+    try {
+        return [WildcardPattern]::new($Pattern, [System.Management.Automation.WildcardOptions]'IgnoreCase, CultureInvariant').IsMatch($Text)
+    } catch [System.Management.Automation.MethodInvocationException] {
+        throw $_.Exception.InnerException
+    }
+}
 
 # The folder of accounts.json (and, outside Windows, of the password files): SMTP_CONFIG_DIR, or else
 # ElektoMailPosh in the user's configuration folder (%APPDATA% on Windows, ~/.config elsewhere)
@@ -77,8 +94,8 @@ function Read-AccountFile {
         if ($data.Accounts -isnot [System.Collections.IDictionary]) { throw "'Accounts' in '$path' must be a JSON object." }
         foreach ($entry in $data.Accounts.GetEnumerator()) {
             $name = $entry.Key
-            if ($name -notmatch $script:AccountNamePattern) {
-                throw "Invalid account name '$name' in '$path': use letters, digits, '.', '-' and '_', starting with a letter or digit."
+            if ($name -cnotmatch $script:AccountNamePattern) {
+                throw "Invalid account name '$name' in '$path': use letters from A to Z, digits, '.', '-' and '_', starting with a letter or digit."
             }
             $sameName = @($accounts.psbase.Keys | Where-Object { $_ -eq $name })
             if ($sameName) { throw "The accounts '$($sameName[0])' and '$name' in '$path' differ only in case, which makes them the same account: rename or remove one." }

@@ -20,7 +20,8 @@ Passwords are never written there:
 Only the settings given are changed. An empty value removes a setting.
 
 .PARAMETER Name
-The name of the account: letters, digits, '.', '-' and '_', starting with a letter or digit.
+The name of the account: letters from A to Z (in either case), digits, '.', '-' and '_', starting with a
+letter or digit.
 
 .PARAMETER Server
 The SMTP server. Required for a new account (unless it comes from -FromEnvironment).
@@ -81,7 +82,9 @@ Function Set-MailAccount {
     [CmdletBinding(SupportsShouldProcess)]
     param (
         [Parameter(Mandatory = $true, Position = 0)]
-        [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]*$')]
+        # Options None tells case apart, as the pattern names both: by default it ignores case as the culture does,
+        # and took a dotless i in Turkish, and a dotted capital I in any culture
+        [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]*$', Options = 'None')]
         [string]$Name,
 
         [string]$Server,

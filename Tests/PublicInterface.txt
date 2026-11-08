@@ -45,7 +45,7 @@ Send-Mail
 
 Set-MailAccount
   __AllParameterSets
-    -Name String, position 0, mandatory, ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
+    -Name String, position 0, mandatory, ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]*$', Options = 'None')
     -Bcc String[]
     -Cc String[]
     -Confirm SwitchParameter, alias cf, ConfirmImpact Medium
