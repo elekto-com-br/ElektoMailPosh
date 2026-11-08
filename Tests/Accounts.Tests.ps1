@@ -1,9 +1,9 @@
 # The accounts file and the password store. The file is read ignoring case, as the rest of the module and the
 # password stores are: keys and settings in any case, accounts found by their name in any case, and two names
 # refused when they would be the same account or share a password variable. The folder it is kept in. And the
-# file and the passwords kept whole when reading, writing or deleting fails. The password stores are replaced by
-# mocks or by SMTP_PASS_<ACCOUNT>, so no real one is read or written, but for the password files of Linux and
-# macOS, under the test folder, to see a write and a deletion that fail.
+# file and the passwords kept whole when reading, writing or deleting fails. The accounts are those of the test drive
+# and no real password store is reached (Tests/TestIsolation.ps1); the password files of Linux and macOS, in the
+# test drive, are real, to see a write and a deletion that fail.
 
 # PSScriptAnalyzer does not see that Pester gives the tests the variables of BeforeDiscovery, BeforeAll and BeforeEach
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification = 'Variables of BeforeDiscovery, BeforeAll and BeforeEach are used by the tests')]
@@ -15,39 +15,17 @@ BeforeDiscovery {
 }
 
 BeforeAll {
+    . (Join-Path $PSScriptRoot 'TestIsolation.ps1')
     Import-Module (Join-Path (Split-Path $PSScriptRoot) 'ElektoMailPosh.psd1') -Force
+    $isolation = Enter-TestIsolation
 
-    # An empty configuration folder, and the password of the account "work" in the environment, so that
-    # no password store is read
-    $savedEnvironment = @{}
-    foreach ($name in 'SMTP_CONFIG_DIR', 'SMTP_PASS_WORK', 'XDG_CONFIG_HOME') {
-        $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name)
-    }
-    $env:SMTP_CONFIG_DIR = Join-Path $TestDrive 'config'
+    # The password of the account "work" in the environment, so that most tests need no password store
     $env:SMTP_PASS_WORK = 'not-a-password'
-    New-Item -ItemType Directory -Path $env:SMTP_CONFIG_DIR | Out-Null
     $accountsFile = Join-Path $env:SMTP_CONFIG_DIR 'accounts.json'
-    $manifestPath = Join-Path (Split-Path $PSScriptRoot) 'ElektoMailPosh.psd1'
-
-    # Runs a script in a process of its own, as a user's script runs, and returns its output as text. Pester runs each
-    # test inside a try/catch, and within one an exception of .NET stops the command, where in a script without one it
-    # ends only its own statement and the command goes on (measured); the XML in which PowerShell takes back the output
-    # of a script block stops it too (measured), so the output comes back as text. The script gets the module, with
-    # the configuration folder of the tests.
-    function Invoke-AsUserScript([scriptblock]$Script) {
-        & ([Environment]::ProcessPath) -NoProfile -NonInteractive -OutputFormat text -Command {
-            param($Manifest, $Config, $Script)
-            $env:SMTP_CONFIG_DIR = $Config
-            $module = Import-Module $Manifest -PassThru
-            & ([scriptblock]::Create($Script)) $module
-        } -args $manifestPath, $env:SMTP_CONFIG_DIR, "$Script" 2>$null
-    }
 }
 
 AfterAll {
-    foreach ($entry in $savedEnvironment.GetEnumerator()) {
-        [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value)
-    }
+    Exit-TestIsolation $isolation
     Remove-Module ElektoMailPosh -ErrorAction SilentlyContinue
 }
 
@@ -133,7 +111,7 @@ Describe 'The configuration folder' {
 
     AfterAll {
         $env:SMTP_CONFIG_DIR = Join-Path $TestDrive 'config'
-        $env:XDG_CONFIG_HOME = $savedEnvironment.XDG_CONFIG_HOME
+        $env:XDG_CONFIG_HOME = $null
     }
 
     It 'is ElektoMailPosh in %APPDATA% on Windows' -Skip:(-not $IsWindows) {
@@ -254,7 +232,7 @@ Describe 'An accounts file that can be written but not read' -Skip:($IsWindows -
     }
 }
 
-# The real password files, under the test folder (so not on Windows, where the store is the Credential Manager)
+# The real password files, in the test drive (so not on Windows, where the store is the Credential Manager)
 Describe 'A password file that cannot be written or deleted' -Skip:$IsWindows {
     BeforeAll {
         $env:SMTP_PASS_WORK = $null
@@ -324,19 +302,36 @@ Describe 'The mode of the accounts file' -Skip:$IsWindows {
     }
 }
 
-# accounts.json kept in a dotfiles repository and linked into the configuration folder, as GNU stow does. A link on
-# Windows needs a privilege, so not there.
+# accounts.json kept in a dotfiles repository and linked into the configuration folder, as GNU stow does, by a link that
+# may be relative or point to another link. The links are made by .NET, which keeps a relative target as it is given.
+# A link on Windows needs a privilege, so not there.
 Describe 'An accounts file that is a link' -Skip:$IsWindows {
-    It 'stays a link, and the file it points to gets the change' {
-        $dotfiles = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'dotfiles') -Force
+    # Resolving one link only (ResolveLinkTarget(..., $false)) would rename over the link in the middle
+    It 'stays <Case>, and the file it finally points to gets the change' -TestCases @(
+        @{ Case = 'a link'; Folder = 'direct' }
+        @{ Case = 'a relative link'; Folder = 'relative' }
+        @{ Case = 'a link to a link'; Folder = 'chain' }
+    ) {
+        $dotfiles = New-Item -ItemType Directory -Path (Join-Path $TestDrive "dotfiles-$Folder") -Force
         $real = Join-Path $dotfiles.FullName 'accounts.json'
         Set-Content -Path $real -Value '{ "Accounts": { "work": { "Server": "smtp.example.com", "User": "me@example.com" } } }'
+        $middle = $null
+        $target = switch ($Folder) {
+            'direct' { $real }
+            'relative' { [IO.Path]::GetRelativePath($env:SMTP_CONFIG_DIR, $real) }
+            'chain' {
+                $middle = Join-Path $dotfiles.FullName 'middle.json'
+                $null = [IO.File]::CreateSymbolicLink($middle, $real)
+                $middle
+            }
+        }
         Remove-Item -LiteralPath $accountsFile -Force -ErrorAction Ignore
-        New-Item -ItemType SymbolicLink -Path $accountsFile -Target $real | Out-Null
+        $null = [IO.File]::CreateSymbolicLink($accountsFile, $target)
         try {
             Set-MailAccount -Name work -Port 2525
 
-            (Get-Item -LiteralPath $accountsFile).LinkTarget | Should -Be $real
+            (Get-Item -LiteralPath $accountsFile).LinkTarget | Should -Be $target
+            if ($middle) { (Get-Item -LiteralPath $middle).LinkTarget | Should -Be $real }
             (Get-Content -Path $real -Raw | ConvertFrom-Json -AsHashtable).Accounts.work.Port | Should -Be 2525
             @(Get-ChildItem -Path $env:SMTP_CONFIG_DIR, $dotfiles.FullName -Filter '*.tmp') | Should -BeNullOrEmpty
         } finally {

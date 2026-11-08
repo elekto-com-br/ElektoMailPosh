@@ -5,8 +5,14 @@
 # "WORK-INBOX" when given "work-inbox" (measured). Names are checked telling case apart and matched by Test-Wildcard, and
 # the code of the module compares text in no other way that the culture changes.
 
+# PSScriptAnalyzer does not see that Pester gives AfterAll and the tests the variables of BeforeAll
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification = 'Variables of BeforeAll are used by AfterAll and the tests')]
+param ()
+
 BeforeAll {
+    . (Join-Path $PSScriptRoot 'TestIsolation.ps1')
     Import-Module (Join-Path (Split-Path $PSScriptRoot) 'ElektoMailPosh.psd1') -Force
+    $isolation = Enter-TestIsolation
 
     # Runs a script with the thread in the culture given, as a session in that culture runs, and puts the culture back
     function Invoke-InCulture([string]$Culture, [scriptblock]$Script) {
@@ -21,6 +27,7 @@ BeforeAll {
 }
 
 AfterAll {
+    Exit-TestIsolation $isolation
     Remove-Module ElektoMailPosh -ErrorAction SilentlyContinue
 }
 
@@ -158,19 +165,12 @@ Describe 'Account names in a session that starts in another culture' {
         @{ Culture = 'tr-TR' }
         @{ Culture = 'en-US' }
     ) {
-        $config = Join-Path $TestDrive $Culture
-        $null = New-Item -ItemType Directory -Path $config
-        $result = & ([Environment]::ProcessPath) -NoProfile -NonInteractive -Command {
-            param($Manifest, $Config, $Culture)
-            [cultureinfo]::CurrentCulture = $Culture
-            $env:SMTP_CONFIG_DIR = $Config
-            $module = Import-Module $Manifest -PassThru
-            # The Credential Manager of Windows is the user's own: nothing here deletes a password from it
-            & $module { function script:Clear-StoredPassword { $false } }
+        # The accounts of each culture in a folder of its own, in the test drive; the result comes back as JSON
+        $result = Invoke-AsUserScript -Config (Join-Path $TestDrive $Culture) -Culture $Culture {
             # A name taken is written; one refused throws, as a parameter or read from the file
             function Test-Taken([scriptblock]$Script) { try { $null = & $Script; $true } catch { $false } }
             $account = @{ Server = 'smtp.example.com'; User = 'me@example.com'; WarningAction = 'SilentlyContinue' }
-            $file = Join-Path $Config 'accounts.json'
+            $file = Join-Path $env:SMTP_CONFIG_DIR 'accounts.json'
             $dotless = 'k' + [char]0x131 + 'y' + [char]0x131
             $dotted = 'K' + [char]0x130 + 'Y' + [char]0x130
             [pscustomobject]@{
@@ -182,8 +182,8 @@ Describe 'Account names in a session that starts in another culture' {
                 Removed       = Test-Taken { Remove-MailAccount -Name 'Work-Inbox' -Confirm:$false -ErrorAction Stop; if (Get-MailAccount 'WORK-INBOX' -ErrorAction SilentlyContinue) { throw 'still there' } }
                 DotlessInFile = Test-Taken { Set-Content -LiteralPath $file -Value ('{ "Accounts": { "' + $dotless + '": { "Server": "s", "User": "u" } } }'); Get-MailAccount -ErrorAction Stop }
                 DottedInFile  = Test-Taken { Set-Content -LiteralPath $file -Value ('{ "Accounts": { "' + $dotted + '": { "Server": "s", "User": "u" } } }'); Get-MailAccount -ErrorAction Stop }
-            }
-        } -args (Join-Path (Split-Path $PSScriptRoot) 'ElektoMailPosh.psd1'), $config, $Culture
+            } | ConvertTo-Json -Compress
+        } | ConvertFrom-Json
 
         $result.Culture | Should -Be $Culture
         $result.Plain | Should -BeTrue
