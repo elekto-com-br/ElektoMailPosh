@@ -8,8 +8,8 @@
 # - on Windows, where the passwords go to the Credential Manager of the user whatever the folder, the functions that
 #   read, store and delete them are replaced by ones that touch nothing.
 # Invoke-AsUserScript runs a script in a process of its own with the same isolation, and refuses to run one whose
-# accounts would be outside the test drive. Build.ps1 adds a check of its own: the real accounts folders, compared before
-# and after the tests.
+# accounts would be outside the test drive. Build.ps1 adds a check of its own: the real accounts (their folders, and on
+# Windows the credentials of the module in the Credential Manager), compared before and after the tests.
 
 # Clears the variables, points SMTP_CONFIG_DIR into the test drive and, on Windows (or with -ReplaceStore),
 # replaces the password store. Returns what Exit-TestIsolation puts back.
