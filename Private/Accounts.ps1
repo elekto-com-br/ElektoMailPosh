@@ -41,7 +41,7 @@ function Get-AccountDirectory {
     $configuration = $env:XDG_CONFIG_HOME
     if (-not $configuration -or -not [IO.Path]::IsPathRooted($configuration)) { $configuration = Join-Path $HOME '.config' }
     $directory = Join-Path $configuration 'ElektoMailPosh'
-    # 2.0.0 to 2.0.4 kept it where .NET puts ApplicationData, which on macOS is ~/Library/Application Support: that
+    # 2.0.0 to 2.0.3 kept it where .NET puts ApplicationData, which on macOS is ~/Library/Application Support: that
     # folder, with its password files, is still the one while it has an accounts file and the new one has none
     $previous = Get-ApplicationDataDirectory
     if ($previous -ne $directory -and -not (Test-Path -LiteralPath (Join-Path $directory 'accounts.json') -PathType Leaf) -and

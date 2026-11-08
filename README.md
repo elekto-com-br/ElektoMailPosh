@@ -90,7 +90,7 @@ The file is read ignoring case, as PowerShell reads names: keys and settings can
 
 The file is written beside itself and then put in its place, so a write that fails leaves the previous file whole. It keeps its mode on Linux and macOS, and when it is a link (into a dotfiles repository, say), the change goes to the file it points to and the link stays.
 
-On macOS, versions 2.0.0 to 2.0.4 kept the folder in `~/Library/Application Support/ElektoMailPosh` (where .NET 8 puts the configuration of applications) rather than in `~/.config`. That folder is still used while `~/.config/ElektoMailPosh` has no `accounts.json`; to move it, with its passwords:
+On macOS, versions 2.0.0 to 2.0.3 kept the folder in `~/Library/Application Support/ElektoMailPosh` (where .NET 8 puts the configuration of applications) rather than in `~/.config`. That folder is still used while `~/.config/ElektoMailPosh` has no `accounts.json`; to move it, with its passwords:
 
 ```bash
 mkdir -p ~/.config && mv ~/Library/Application\ Support/ElektoMailPosh ~/.config/

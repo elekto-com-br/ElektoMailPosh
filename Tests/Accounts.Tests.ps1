@@ -141,7 +141,7 @@ Describe 'The configuration folder' {
     }
 
     # The same code for Linux and macOS, where .NET 8 and later give ~/Library/Application Support instead. The
-    # folder of 2.0.4 and before is put out of the way, as a real one of this machine would be taken instead.
+    # folder of 2.0.3 and before is put out of the way, as a real one of this machine would be taken instead.
     It 'is ElektoMailPosh in ~/.config on Linux and macOS, or in XDG_CONFIG_HOME when it is an absolute path' -Skip:$IsWindows {
         Mock -ModuleName ElektoMailPosh Get-ApplicationDataDirectory { Join-Path $TestDrive 'nowhere' }
 
@@ -153,8 +153,8 @@ Describe 'The configuration folder' {
         InModuleScope ElektoMailPosh { Get-AccountDirectory } | Should -Be (Join-Path $HOME '.config/ElektoMailPosh') -Because 'XDG_CONFIG_HOME counts only as an absolute path'
     }
 
-    # 2.0.0 to 2.0.4 kept it in the folder .NET gives for ApplicationData: ~/Library/Application Support on macOS
-    It 'is that of 2.0.4 and before while it has an accounts file and the new one has none' -Skip:$IsWindows {
+    # 2.0.0 to 2.0.3 kept it in the folder .NET gives for ApplicationData: ~/Library/Application Support on macOS
+    It 'is that of 2.0.3 and before while it has an accounts file and the new one has none' -Skip:$IsWindows {
         $env:XDG_CONFIG_HOME = Join-Path $TestDrive 'moved/xdg'
         $new = Join-Path $env:XDG_CONFIG_HOME 'ElektoMailPosh'
         $previous = Join-Path $TestDrive 'moved/Library/Application Support/ElektoMailPosh'
@@ -165,7 +165,7 @@ Describe 'The configuration folder' {
 
         New-Item -ItemType Directory -Path $previous -Force | Out-Null
         Set-Content -Path (Join-Path $previous 'accounts.json') -Value $json
-        InModuleScope ElektoMailPosh { Get-AccountDirectory } | Should -Be $previous -Because 'only the folder of 2.0.4 has an accounts file'
+        InModuleScope ElektoMailPosh { Get-AccountDirectory } | Should -Be $previous -Because 'only the folder of 2.0.3 has an accounts file'
         InModuleScope ElektoMailPosh { Get-PasswordFilePath work } | Should -Be (Join-Path $previous 'secrets/work')
         (Get-MailAccount).Name | Should -Be 'work'
 
