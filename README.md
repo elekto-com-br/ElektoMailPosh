@@ -122,10 +122,12 @@ Set-MailAccount -Name automation -FromEnvironment -Default
 From then on `Send-Mail` uses that account and ignores the variables, so remove them, above all `SMTP_PASS`. On Windows:
 
 ```powershell
-foreach ($name in 'SMTP_SERVER', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM', 'SMTP_FROM_NAME', 'SMTP_TO', 'SMTP_CC', 'SMTP_BCC') {
-    [Environment]::SetEnvironmentVariable($name, $null, 'User')   # 'Machine', from an elevated shell, for variables set for the whole machine
+foreach ($name in 'SMTP_SERVER', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM', 'SMTP_FROM_NAME', 'SMTP_TO', 'SMTP_CC', 'SMTP_BCC', 'SMTP_REPLY_TO') {
+    [Environment]::SetEnvironmentVariable($name, [NullString]::Value, 'User')   # 'Machine', from an elevated shell, for variables set for the whole machine
 }
 ```
+
+`[NullString]::Value` deletes the variable. `$null` would reach .NET as an empty string, which since PowerShell 7.5 (.NET 9) leaves the variable in place, empty.
 
 On Linux and macOS, remove them from wherever they are set (shell profile, PowerShell profile, systemd unit).
 

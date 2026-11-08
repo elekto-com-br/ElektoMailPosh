@@ -154,8 +154,15 @@ Function Set-MailAccount {
     if ($secret) {
         Save-StoredPassword $Name $settings.User $secret
         Write-Verbose "Password of account '$Name' stored."
-    } elseif (-not (Get-AccountPassword $Name)) {
-        Write-Warning (Get-MissingPasswordMessage $Name)
+    } else {
+        # A stored password that cannot be used (a file that cannot be read, or that others can read) is not a
+        # missing one: the warning said the account had no password, after the error itself. Get-MailAccount calls
+        # it Unusable, with the reason.
+        try {
+            if (-not (Get-AccountPassword $Name)) { Write-Warning (Get-MissingPasswordMessage $Name) }
+        } catch {
+            Write-Warning "The stored password of account '$Name' cannot be used: $($_.Exception.Message)"
+        }
     }
 
     # While an account is the default, the SMTP_* variables are of no use, and SMTP_PASS should not linger

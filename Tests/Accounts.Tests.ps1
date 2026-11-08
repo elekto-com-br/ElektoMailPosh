@@ -201,6 +201,8 @@ Describe 'Keeping the accounts file whole' {
 
             Join-Path $env:SMTP_CONFIG_DIR 'stored' | Should -Not -Exist -Because 'Set-MailAccount stops before it stores the password of an account it did not write'
             @(Get-ChildItem -Path $env:SMTP_CONFIG_DIR -Filter '*.tmp') | Should -BeNullOrEmpty
+            # And what it says: on Windows, .NET says only "Access to the path is denied"
+            { Set-MailAccount -Name home -Server smtp.example.net -User me@example.net -Password $password } | Should -Throw -ExpectedMessage '*Could not replace the accounts file*'
         } finally {
             Remove-Item -LiteralPath $accountsFile -Recurse -Force
         }
@@ -233,7 +235,7 @@ Describe 'An accounts file that can be written but not read' -Skip:($IsWindows -
 }
 
 # The real password files, in the test drive (so not on Windows, where the store is the Credential Manager)
-Describe 'A password file that cannot be written or deleted' -Skip:$IsWindows {
+Describe 'A password file that cannot be written, read or deleted' -Skip:$IsWindows {
     BeforeAll {
         $env:SMTP_PASS_WORK = $null
         $secrets = Join-Path $env:SMTP_CONFIG_DIR 'secrets'
@@ -261,6 +263,25 @@ Describe 'A password file that cannot be written or deleted' -Skip:$IsWindows {
             [IO.File]::SetUnixFileMode($folder.FullName, 'UserRead, UserWrite, UserExecute')
             Remove-Item -LiteralPath $folder.FullName -Recurse -Force
         }
+    }
+
+    # Taken for a missing one: after the error of .NET, Set-MailAccount warned that the account had no password. Not as
+    # root, who reads it all the same.
+    It 'is reported by Set-MailAccount as unusable when it cannot be read, and not as missing' -Skip:$isRoot {
+        Set-MailAccount -Name work -Password $password
+        $file = Join-Path $secrets 'work'
+        [IO.File]::SetUnixFileMode($file, 'None')
+        try {
+            # What reaches the stream of errors: -ErrorVariable would also keep errors that a try/catch handled
+            $failures = @(Set-MailAccount -Name work -Port 2525 -WarningVariable warnings -WarningAction SilentlyContinue 2>&1)
+        } finally {
+            [IO.File]::SetUnixFileMode($file, 'UserRead, UserWrite')
+        }
+
+        $failures | Should -BeNullOrEmpty
+        $warnings -join "`n" | Should -BeLike "*stored password of account 'work' cannot be used*denied*"
+        $warnings -join "`n" | Should -Not -BeLike '*has no password*'
+        (Get-MailAccount work).Port | Should -Be 2525
     }
 
     # In a folder where it cannot be deleted (so not as root). It is deleted by .NET, as a credential of Windows is,
