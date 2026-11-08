@@ -124,6 +124,12 @@ namespace ElektoMailPosh
 '@
 }
 
+# Saving and deleting a password stop the command on any failure ($ErrorActionPreference = 'Stop'). The Credential
+# Manager and the files are reached through .NET, and an exception of .NET ends only its own statement otherwise: the
+# command went on, Set-MailAccount as if the password were stored, and Remove-MailAccount took a password that could
+# not be deleted for none stored, and removed its account (measured with another call of .NET that throws, as
+# PowerShell treats them all alike). Reading needs no such stop: Send-Mail and Get-MailAccount catch what it throws.
+
 # The stored password of the account, or $null when none is stored
 function Read-StoredPassword([string]$Account) {
     if ($IsWindows) {
@@ -137,10 +143,13 @@ function Read-StoredPassword([string]$Account) {
     if ([IO.File]::GetUnixFileMode($path) -band $othersAccess) {
         throw "The password file '$path' can be read by other users. Restrict it with: chmod 600 '$path'"
     }
+    # The file may be written by hand (echo, an editor), which ends it with a newline that is not part of the
+    # password; one that really ends in CR or LF cannot be typed at Read-Host
     return ([IO.File]::ReadAllText($path)).TrimEnd("`r", "`n")
 }
 
 function Save-StoredPassword([string]$Account, [string]$User, [string]$Secret) {
+    $ErrorActionPreference = 'Stop'
     if ($IsWindows) {
         Initialize-CredentialManager
         [ElektoMailPosh.CredentialManager]::Write($script:CredentialTargetPrefix + $Account, $User, $Secret)
@@ -164,8 +173,10 @@ function Save-StoredPassword([string]$Account, [string]$User, [string]$Secret) {
     }
 }
 
-# False when no password was stored
+# False when no password was stored. A password that stays is an error that stops the caller, not a password
+# reported as deleted.
 function Clear-StoredPassword([string]$Account) {
+    $ErrorActionPreference = 'Stop'
     if ($IsWindows) {
         Initialize-CredentialManager
         return [ElektoMailPosh.CredentialManager]::Delete($script:CredentialTargetPrefix + $Account)
@@ -173,7 +184,9 @@ function Clear-StoredPassword([string]$Account) {
 
     $path = Get-PasswordFilePath $Account
     if (-not (Test-Path -LiteralPath $path)) { return $false }
-    Remove-Item -LiteralPath $path -Force
+    # Deleted by .NET, as the Credential Manager deletes, so that a file that cannot be deleted fails as a credential
+    # does, and the test of one, which runs on Linux and macOS, covers the stop that Windows relies on
+    [IO.File]::Delete($path)
     return $true
 }
 

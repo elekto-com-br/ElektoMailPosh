@@ -12,7 +12,7 @@
 RootModule = 'ElektoMailPosh.psm1'
 
 # Version number of this module.
-ModuleVersion = '2.0.4'
+ModuleVersion = '2.0.5'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Core')
@@ -110,6 +110,14 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
+## 2.0.5
+- An accounts file that cannot be read stops the command, saying so. It was taken for an empty one: Send-Mail went back to the SMTP_* environment variables, and Set-MailAccount wrote the new account over the others (a file its owner could write but not read it left empty, and every account was lost)
+- accounts.json is written beside itself and then put in its place, so a write that fails leaves the previous file whole. Outside Windows the new file keeps the mode of the old one, and a file that is a link (into a dotfiles repository, say) stays a link, the change going to the file it points to
+- On macOS the folder is ~/.config/ElektoMailPosh (or XDG_CONFIG_HOME), as the README said, and the same as on Linux: since .NET 8 it was ~/Library/Application Support/ElektoMailPosh. That folder is still used while the new one has no accounts.json; the README says how to move it
+- Two accounts whose names give the same password variable, such as work.prod and work-prod (both SMTP_PASS_WORK_PROD), are refused, in the file and by Set-MailAccount for a new account: with the variable set, one sent the password of the other to its own server
+- Remove-MailAccount deletes the password before it removes the account from the file, and a password that cannot be deleted stops it. Before, the account was removed and its password left behind, with no account to show it, and reported as deleted
+- A failure of the password store, or of putting the accounts file in its place, stops Set-MailAccount and Remove-MailAccount: an error of .NET (of the Windows Credential Manager, say) ended only its own statement, and the command went on as if it had worked
+
 ## 2.0.4
 - Account names are checked alike in every culture, and take only the letters A to Z: a name with a dotless i was taken in a session in Turkish, and one with a dotted capital I in any session, and the accounts file was then refused in sessions in other cultures. A file that holds such a name is now refused everywhere: rename that account
 - In a session in Turkish, Get-MailAccount, Remove-MailAccount and the completion of account names find an account whatever the case of the i in its name: "Remove-MailAccount work-inbox" missed the account WORK-INBOX

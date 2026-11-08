@@ -9,13 +9,15 @@ mailboxes. `Send-Mail -Account <name>` sends from one of them; the default accou
 Send-Mail is called without -Account.
 
 The settings are kept in accounts.json, in the folder ElektoMailPosh of the user's configuration
-folder (%APPDATA% on Windows, ~/.config elsewhere), or in the folder named by SMTP_CONFIG_DIR.
-Passwords are never written there:
+folder (%APPDATA% on Windows; XDG_CONFIG_HOME, or else ~/.config, on Linux and macOS), or in the
+folder named by SMTP_CONFIG_DIR. Passwords are never written there:
 - On Windows they go to the Credential Manager, as the generic credential "ElektoMailPosh:<name>",
   encrypted with the user's logon (DPAPI).
 - On Linux and macOS they go to the file secrets/<name> in that folder, readable only by its owner.
 - On any platform, the environment variable SMTP_PASS_<NAME> (the name in upper case, with any
-  character other than letters and digits as "_") takes precedence over the stored password.
+  character other than letters and digits as "_") takes precedence over the stored password. So a
+  new account whose name gives the variable of another, such as work-prod beside work.prod, is
+  refused.
 
 Only the settings given are changed. An empty value removes a setting.
 
@@ -106,9 +108,16 @@ Function Set-MailAccount {
     $accounts = if ($file) { $file.Accounts } else { [ordered]@{} }
     $defaultName = if ($file) { $file.Default } else { $null }
 
-    # An existing account keeps the spelling of its name
+    # An existing account keeps the spelling of its name; a new one may not take the password variable of another,
+    # whose password it would then send to its own server
     $existingName = Find-AccountName $file $Name
     if ($existingName) { $Name = $existingName }
+    else {
+        $sameVariable = Find-PasswordVariableOwner $accounts.psbase.Keys $Name
+        if ($sameVariable) {
+            throw "Account '$Name' would share the password variable $(Get-PasswordVariableName $Name) with the account '$sameVariable', which would give one the password of the other: choose a name that differs in its letters or digits."
+        }
+    }
     $settings = [ordered]@{}
     if ($existingName) { foreach ($key in $accounts[$Name].psbase.Keys) { $settings[$key] = $accounts[$Name][$key] } }
 
